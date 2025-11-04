@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 ml_server.py
 Implementação MissionLink (ML) UDP server (Nave-Mãe)
