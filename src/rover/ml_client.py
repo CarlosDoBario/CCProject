@@ -1,23 +1,8 @@
 """
 ml_client.py
-Implementação MissionLink (ML) UDP client (Rover)
+MissionLink (ML) UDP client (Rover) implementation integrated with RoverSim.
 
-Funcionalidades implementadas nesta versão:
-- Cliente ML baseado em asyncio que:
-  - envia REQUEST_MISSION com mecanismo de pending/retransmit;
-  - recebe MISSION_ASSIGN, valida checksum e envia ACK;
-  - mantém pending map para mensagens que exigem ACK;
-  - envia PROGRESS periodicamente durante a execução da missão (com retransmit);
-  - envia MISSION_COMPLETE e espera ACK;
-  - lógica simples de deduplicação/reenviar ACKs para mensagens duplicadas.
-- Integra com common.ml_schema, common.config e common.utils.
-
-Como usar (exemplo rápido):
-  PYTHONPATH=src python3 src/rover/ml_client.py --rover-id R-001 --server 127.0.0.1 --port 50000
-
-Notas:
-- Esta implementação é feita para facilitar testes locais e integração com o servidor ml_server.py.
-- Para simulação completa (movimento, energia, falhas) integra com rover_sim.py (não incluído aqui).
+Updated: adds handling for MISSION_CANCEL and a simple fallback when pending retransmits exhaust.
 """
 
 import asyncio
@@ -26,12 +11,12 @@ from typing import Dict, Any, Optional, Tuple
 import traceback
 
 from common import ml_schema, config, utils
+from rover.rover_sim import RoverSim
 
 logger = utils.get_logger("ml.client")
 
-
 class PendingSend:
-    def __init__(self, msg_id: str, packet: bytes, addr: Tuple[str, int], created_at: float, timeout_s: float):
+    def __init__(self, msg_id: str, packet: bytes, addr: Tuple[str, int], created_at: float, timeout_s: float, message_type: str):
         self.msg_id = msg_id
         self.packet = packet
         self.addr = addr
@@ -39,6 +24,7 @@ class PendingSend:
         self.next_timeout = created_at + timeout_s
         self.attempts = 0
         self.base_timeout = timeout_s
+        self.message_type = message_type
 
 
 class MLClientProtocol(asyncio.DatagramProtocol):
@@ -59,12 +45,18 @@ class MLClientProtocol(asyncio.DatagramProtocol):
         self.current_mission: Optional[Dict[str, Any]] = None
         self.progress_task = None
 
+        # rover simulator (created on assign)
+        self.rover_sim: Optional[RoverSim] = None
+
         # metrics
         self.metrics = utils.metrics
 
         # background task
         self._task_retransmit = None
         self._task_cleanup = None
+
+        # simple backoff generator for re-requesting mission on failures
+        self._re_request_backoff = utils.exponential_backoff(base=1.0, factor=2.0, max_delay=30.0)
 
     def connection_made(self, transport):
         self.transport = transport
@@ -111,6 +103,12 @@ class MLClientProtocol(asyncio.DatagramProtocol):
                 self._send_ack_immediate(ack_env, addr)
                 # process assign
                 asyncio.get_event_loop().create_task(self._handle_assign(envelope, addr))
+            elif mtype == "MISSION_CANCEL":
+                # stop mission immediately
+                logger.info(f"Received MISSION_CANCEL for mission {header.get('mission_id')}: stopping local execution")
+                self._handle_mission_cancel(header.get("mission_id"))
+                ack_env = ml_schema.make_ack(msg_id, rover_id=self.rover_id, mission_id=header.get("mission_id"))
+                self._send_ack_immediate(ack_env, addr)
             elif mtype == "ERROR":
                 logger.warning(f"Received ERROR from server: {body}")
             elif mtype == "ACK":
@@ -144,16 +142,17 @@ class MLClientProtocol(asyncio.DatagramProtocol):
 
         header = env["header"]
         msg_id = header["msg_id"]
+        msg_type = header.get("message_type", "UNKNOWN")
         now = time.time()
         timeout = config.TIMEOUT_TX_INITIAL
-        pending = PendingSend(msg_id=msg_id, packet=packet, addr=addr, created_at=now, timeout_s=timeout)
+        pending = PendingSend(msg_id=msg_id, packet=packet, addr=addr, created_at=now, timeout_s=timeout, message_type=msg_type)
         pending.attempts = 1
         pending.next_timeout = now + timeout
         if expect_ack:
             self.pending[msg_id] = pending
         # send immediately
         self._send_packet(packet, addr)
-        logger.debug(f"Sent {header['message_type']} msg_id={msg_id} to {addr} (attempt 1)")
+        logger.debug(f"Sent {msg_type} msg_id={msg_id} to {addr} (attempt 1)")
 
     def _send_ack_immediate(self, ack_env: Dict[str, Any], addr: Tuple[str, int]):
         """
@@ -175,8 +174,7 @@ class MLClientProtocol(asyncio.DatagramProtocol):
     # -------------------------
     async def request_mission(self, server_addr: Tuple[str, int]):
         """
-        Envia REQUEST_MISSION e espera por MISSION_ASSIGN (ou ERROR).
-        Usa pending/retransmit para assegurar entrega.
+        Envia REQUEST_MISSION; does not expect ACK but server will reply with ASSIGN/ERROR.
         """
         body = {
             "capabilities": ["sampling", "imaging", "env"],
@@ -186,86 +184,97 @@ class MLClientProtocol(asyncio.DatagramProtocol):
         }
         env = ml_schema.build_envelope("REQUEST_MISSION", body=body, rover_id=self.rover_id)
         self._enqueue_and_send(env, server_addr, expect_ack=False)
-        # Note: server will respond with MISSION_ASSIGN, which our datagram_received handles
 
     async def _handle_assign(self, envelope: Dict[str, Any], addr: Tuple[str, int]):
-        """
-        Processa MISSION_ASSIGN: guarda mission, inicia loop de progressos.
-        """
         header = envelope["header"]
         body = envelope["body"]
         mission_id = body.get("mission_id")
         logger.info(f"Mission assigned: {mission_id}, task={body.get('task')} params={body.get('params')}")
-        # store mission
         self.current_mission = {
             "mission_id": mission_id,
             "task": body.get("task"),
             "params": body.get("params", {}),
             "update_interval_s": body.get("update_interval_s", config.DEFAULT_UPDATE_INTERVAL_S),
         }
-        # start progress loop
+        # create or reset rover_sim
+        if self.rover_sim is None:
+            self.rover_sim = RoverSim(self.rover_id, position=(0.0, 0.0, 0.0))
+        mission_spec = {
+            "mission_id": mission_id,
+            "area": body.get("area"),
+            "task": body.get("task"),
+            "params": body.get("params", {}),
+            "update_interval_s": body.get("update_interval_s", config.DEFAULT_UPDATE_INTERVAL_S),
+        }
+        self.rover_sim.start_mission(mission_spec)
+
+        # start progress loop (cancel previous if any)
         if self.progress_task and not self.progress_task.done():
             self.progress_task.cancel()
         loop = asyncio.get_event_loop()
         self.progress_task = loop.create_task(self._progress_loop(addr))
 
+    def _handle_mission_cancel(self, mission_id: Optional[str]) -> None:
+        # Stop rover_sim and current mission if matches
+        if self.current_mission and self.current_mission.get("mission_id") == mission_id:
+            self.current_mission = None
+            if self.progress_task and not self.progress_task.done():
+                self.progress_task.cancel()
+            if self.rover_sim:
+                self.rover_sim.state = "IDLE"
+            logger.info(f"Mission {mission_id} cancelled locally")
+
     async def _progress_loop(self, server_addr: Tuple[str, int]):
-        """
-        Envia PROGRESS periodicamente enquanto current_mission existir.
-        Cada PROGRESS é sujeito a retransmissão (pending).
-        """
+        if not self.rover_sim or not self.current_mission:
+            logger.warning("Progress loop started without rover_sim or current_mission")
+            return
+
+        update_interval = self.current_mission.get("update_interval_s", config.DEFAULT_UPDATE_INTERVAL_S)
         try:
             while self.current_mission:
-                mission_id = self.current_mission["mission_id"]
-                # For demo: increment progress_pct by random small value
-                import random
-                progress_pct = min(100.0, random.uniform(1.0, 5.0) + self._last_progress_pct(mission_id))
+                self.rover_sim.step(update_interval)
+                tel = self.rover_sim.get_telemetry()
                 body = {
-                    "mission_id": mission_id,
-                    "progress_pct": round(progress_pct, 2),
-                    "position": {"x": 0.0, "y": 0.0, "z": 0.0},
-                    "battery_level_pct": max(0, 100 - int(progress_pct)),  # dummy battery drain
-                    "status": "in_progress" if progress_pct < 100.0 else "completed",
-                    "errors": [],
+                    "mission_id": tel.get("mission_id"),
+                    "progress_pct": tel.get("progress_pct"),
+                    "position": tel.get("position"),
+                    "battery_level_pct": tel.get("battery_level_pct"),
+                    "status": tel.get("status"),
+                    "errors": tel.get("last_error") and [tel.get("last_error")] or [],
+                    "samples_collected": tel.get("samples_collected", 0),
                 }
-                env = ml_schema.build_envelope("PROGRESS", body=body, rover_id=self.rover_id, mission_id=mission_id)
-                # use pending retransmit (expect ACK)
+                env = ml_schema.build_envelope("PROGRESS", body=body, rover_id=self.rover_id, mission_id=tel.get("mission_id"))
                 self._enqueue_and_send(env, server_addr, expect_ack=True)
-                # if progress reached 100 -> send MISSION_COMPLETE and break
-                if progress_pct >= 100.0:
-                    # wait a short moment then send complete
-                    await asyncio.sleep(0.5)
+
+                if tel.get("last_error"):
+                    err_body = {
+                        "code": tel["last_error"].get("code"),
+                        "description": tel["last_error"].get("description"),
+                        "severity": "critical",
+                    }
+                    err_env = ml_schema.build_envelope("ERROR", body=err_body, rover_id=self.rover_id, mission_id=tel.get("mission_id"))
+                    self._enqueue_and_send(err_env, server_addr, expect_ack=True)
+                    logger.info("Reported ERROR to server, halting progress loop pending server instruction")
+                    break
+
+                if self.rover_sim.is_mission_complete():
                     complete_body = {
-                        "mission_id": mission_id,
+                        "mission_id": tel.get("mission_id"),
                         "result": "success",
-                        "samples_collected": 1,
+                        "samples_collected": tel.get("samples_collected", 0),
                         "info": "simulated completion",
                     }
-                    complete_env = ml_schema.build_envelope("MISSION_COMPLETE", body=complete_body, rover_id=self.rover_id, mission_id=mission_id)
+                    complete_env = ml_schema.build_envelope("MISSION_COMPLETE", body=complete_body, rover_id=self.rover_id, mission_id=tel.get("mission_id"))
                     self._enqueue_and_send(complete_env, server_addr, expect_ack=True)
-                    # clear mission after sending complete
                     self.current_mission = None
+                    logger.info("Mission complete sent to server")
                     break
-                # sleep until next update
-                await asyncio.sleep(self.current_mission.get("update_interval_s", config.DEFAULT_UPDATE_INTERVAL_S))
+
+                await asyncio.sleep(update_interval)
         except asyncio.CancelledError:
             logger.info("Progress loop cancelled")
         except Exception:
             logger.exception("Error in progress loop")
-
-    def _last_progress_pct(self, mission_id: str) -> float:
-        # naive: check pending progress messages for same mission to estimate last value
-        last = 0.0
-        for p in self.pending.values():
-            try:
-                envelope = ml_schema.parse_envelope(p.packet)
-                h = envelope["header"]
-                b = envelope["body"]
-                if envelope["header"].get("message_type") == "PROGRESS" and b.get("mission_id") == mission_id:
-                    last = max(last, float(b.get("progress_pct", 0.0)))
-            except Exception:
-                continue
-        return last
 
     # -------------------------
     # Incoming ACK handling
@@ -289,27 +298,52 @@ class MLClientProtocol(asyncio.DatagramProtocol):
                 for msg_id, po in list(self.pending.items()):
                     if now >= po.next_timeout:
                         if po.attempts <= config.N_RETX:
-                            # retransmit
                             try:
                                 self.transport.sendto(po.packet, po.addr)
                                 po.attempts += 1
-                                # exponential backoff
                                 po.next_timeout = now + (po.base_timeout * (config.BACKOFF_FACTOR ** (po.attempts - 1)))
                                 logger.warning(f"Retransmit {msg_id} attempt={po.attempts}")
                                 self.metrics.incr("retransmits")
                             except Exception:
                                 logger.exception("Failed retransmit")
                         else:
-                            # retries exhausted
-                            logger.error(f"Retries exhausted for {msg_id}")
-                            # remove pending and take fallback action (log / notify)
+                            # retries exhausted: handle failure
+                            logger.error(f"Retries exhausted for {msg_id} (type={po.message_type})")
                             self.pending.pop(msg_id, None)
+                            # handle failure according to message type
+                            self._handle_send_failure(po)
                 await asyncio.sleep(0.5)
         except asyncio.CancelledError:
             logger.info("_retransmit_loop cancelled")
         except Exception:
             logger.exception("Error in retransmit loop")
             raise
+
+    def _handle_send_failure(self, pending: PendingSend):
+        """
+        Simple fallback policy when a message exhausts retransmits:
+         - If message_type is PROGRESS or MISSION_COMPLETE: log and try to re-request a mission after backoff.
+         - If message_type is ERROR: escalate via log.
+         - Otherwise: log.
+        This is a conservative policy; adapt as needed.
+        """
+        mtype = pending.message_type
+        if mtype in ("PROGRESS", "MISSION_COMPLETE"):
+            # try to re-request mission after backoff
+            delay = next(self._re_request_backoff)
+            logger.warning(f"On send-failure of {mtype}, will attempt to re-request mission after {delay:.1f}s")
+            asyncio.get_event_loop().create_task(self._delayed_re_request(delay, pending.addr))
+        elif mtype == "ERROR":
+            logger.error("Critical ERROR message could not be delivered; logging and continuing")
+        else:
+            logger.error(f"Unacknowledged message {pending.msg_id} of type {mtype}")
+
+    async def _delayed_re_request(self, delay_s: float, server_addr: Tuple[str, int]):
+        await asyncio.sleep(delay_s)
+        try:
+            await self.request_mission(server_addr)
+        except Exception:
+            logger.exception("Failed re-requesting mission")
 
     async def _cleanup_loop(self):
         try:
@@ -342,17 +376,11 @@ async def main(args):
     connect_addr = (server_host, server_port)
     logger.info(f"Starting ML client {rover_id} -> server {connect_addr}")
 
-    # create protocol and endpoint
     transport, protocol = await loop.create_datagram_endpoint(lambda: MLClientProtocol(rover_id), remote_addr=None)
-    # When using sendto with transport created without remote_addr, supply addr in sendto.
-
-    # Note: the protocol.transport is available now
     proto: MLClientProtocol = protocol
 
-    # request mission
     await proto.request_mission(connect_addr)
 
-    # keep running (progress loop will start when assign arrives)
     try:
         while True:
             await asyncio.sleep(1)
@@ -363,7 +391,7 @@ async def main(args):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="MissionLink ML client (Rover)")
+    parser = argparse.ArgumentParser(description="MissionLink ML client (Rover) with RoverSim")
     parser.add_argument("--rover-id", required=True, help="Rover identifier (e.g. R-001)")
     parser.add_argument("--server", default="127.0.0.1", help="Nave-Mãe IP/hostname")
     parser.add_argument("--port", type=int, default=config.ML_UDP_PORT, help="Nave-Mãe ML UDP port")
