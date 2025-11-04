@@ -1,337 +1,413 @@
-#!/usr/bin/env python3
 """
-rover_sim.py
-Simulador de alto-nível do Rover — modela posição 3D (x,y,z), bateria, consumo por ação,
-e injecção de falhas aplicacionais (locomoção, amostragem, sensores).
+ml_client.py
+Implementação do MissionLink (ML) UDP client (Rover) integrada com o roverSim
 
-Objetivo
-- Fornecer uma componente de simulação que pode ser integrada ao ml_client.py para:
-  - calcular posições/waypoints e progresso da missão,
-  - atualizar nível de bateria conforme ações,
-  - decidir quando reportar erros simulados (falhas) e qual o seu efeito,
-  - fornecer métricas locais (samples_collected, etc.)
-- Pode ser usado standalone para observar o comportamento do rover sem ligar ao servidor.
+Funcionalidades nesta versão:
+- Integração de RoverSim para simulação realista de movimento 3D, consumo de energia,
+  execução de tasks (collect_samples, capture_images, env_analysis) e injeção de falhas.
+- Envio de REQUEST_MISSION e recepção de MISSION_ASSIGN (com ACK).
+- Envio periódico de PROGRESS usando a telemetria gerada por RoverSim (com pending/retransmit).
+- Envio de ERROR quando RoverSim reporta falha.
+- Envio de MISSION_COMPLETE quando RoverSim indica conclusão.
+- Pending/retransmit, deduplicação e limpeza de caches (como na versão anterior).
 
-Design e integração
-- Classe principal: RoverSim
-  - Métodos principais:
-    - start_mission(mission_spec): inicializa dados internos (target area, task, params)
-    - step(dt_s): avança a simulação dt_s segundos (movimenta, consome bateria, executa amostragens/imagens)
-    - get_telemetry(): retorna um dicionário compatível com o campo "body" usado nas mensagens PROGRESS/TELEMETRY
-    - inject_failure(kind): força um evento de falha (locomotion, sensor, system, battery)
-    - is_mission_complete(): indica se missão terminou
-  - Propriedades: position (x,y,z), battery_level_pct, state, samples_collected, last_error
-- Falhas:
-  - Probabilísticas: p_move_fail, p_sample_fail, p_system_fail configuráveis.
-  - Ao ocorrer uma falha, RoverSim regista last_error e coloca state em "ERROR" (o cliente decide como reagir: reportar e tentar recuperar).
-- Interface com ml_client:
-  - O cliente pode criar uma instância RoverSim(rover_id, initial_pos=(...))
-  - Ao receber MISSION_ASSIGN, o ml_client passa o body para start_mission(...)
-  - Na rotina de progressos, em vez de valores dummy, o cliente chama step(update_interval) e usa get_telemetry() para preencher o body do PROGRESS.
+Como usar:
+  PYTHONPATH=src python3 src/rover/ml_client.py --rover-id R-001 --server 127.0.0.1 --port 50000
 
-Usos
-- Execução standalone:
-  - PYTHONPATH=src python3 src/rover/rover_sim.py --demo
-  - Mostra uma simulação textual da execução de uma missão demo.
+Integração:
+- Ao receber um MISSION_ASSIGN, o cliente cria uma instância RoverSim (ou reutiliza uma existente)
+  e chama rover_sim.start_mission(assign_body).
+- O loop de progresso chama rover_sim.step(update_interval_s) e usa rover_sim.get_telemetry() para
+  construir o body do PROGRESS. Se rover_sim.last_error estiver presente, envia ERROR.
+- Quando rover_sim.is_mission_complete() for True, envia MISSION_COMPLETE com campos reais
+  (samples_collected, info).
 
-Notas
-- O simulador é intencionalmente simples e determinístico quando as probabilidades de falha são zero.
-- Pode ser ampliado para trajetórias complexas (waypoints), curvas de consumo energia baseadas em terreno, armazenamento de logs, etc.
+Observações:
+- Requer src/rover/rover_sim.py presente (fornecido).
+- Mantém compatibilidade com o servidor ml_server.py e mission_store.
 """
 
-from dataclasses import dataclass, field
-from typing import Dict, Any, Optional, Tuple, List
-import math
-import random
+import asyncio
 import time
-import threading
+from typing import Dict, Any, Optional, Tuple
+import traceback
 
-from common import utils
+from common import ml_schema, config, utils
+from rover.rover_sim import RoverSim
 
-logger = utils.get_logger("ml.rover_sim")
+logger = utils.get_logger("ml.client")
+
+# --- Pending and helper classes (same concept as previous version) -----
 
 
-@dataclass
-class RoverSim:
-    rover_id: str
-    position: Tuple[float, float, float] = (0.0, 0.0, 0.0)  # x,y,z in meters
-    battery_level_pct: float = 100.0
-    state: str = "IDLE"  # IDLE, MOVING, SAMPLING, CAPTURING, ANALYZING, CHARGING, ERROR, COMPLETED
-    samples_collected: int = 0
-    payload_capacity_pct: float = 100.0
-    last_error: Optional[Dict[str, Any]] = None
+class PendingSend:
+    def __init__(self, msg_id: str, packet: bytes, addr: Tuple[str, int], created_at: float, timeout_s: float):
+        self.msg_id = msg_id
+        self.packet = packet
+        self.addr = addr
+        self.created_at = created_at
+        self.next_timeout = created_at + timeout_s
+        self.attempts = 0
+        self.base_timeout = timeout_s
 
-    # mission runtime fields (set by start_mission)
-    current_mission: Optional[Dict[str, Any]] = None
-    mission_start_ts: Optional[float] = None
-    mission_progress_pct: float = 0.0
 
-    # failure probabilities (per-step or per-action)
-    p_move_fail: float = 0.01
-    p_sample_fail: float = 0.02
-    p_system_fail: float = 0.005
+class MLClientProtocol(asyncio.DatagramProtocol):
+    def __init__(self, rover_id: str):
+        self.transport = None
+        self.rover_id = rover_id
 
-    # motion model
-    speed_m_s: float = 0.5  # default speed when moving
-    target_point: Optional[Tuple[float, float, float]] = None
+        # pending messages that expect ACK
+        self.pending: Dict[str, PendingSend] = {}
 
-    # internal
-    _lock: threading.Lock = field(default_factory=threading.Lock, init=False)
+        # dedup seen inbound messages: msg_id -> timestamp
+        self.seen_inbound: Dict[str, float] = {}
 
-    def start_mission(self, mission_spec: Dict[str, Any]) -> None:
-        """
-        Inicializa a missão no simulador a partir do mission_spec (o body do MISSION_ASSIGN).
-        Espera mission_spec contendo keys: mission_id, area, task, params, update_interval_s.
-        """
-        with self._lock:
-            self.current_mission = mission_spec.copy()
-            self.mission_start_ts = time.time()
-            self.mission_progress_pct = 0.0
-            self.samples_collected = 0
-            self.state = "ASSIGNED"
-            # Decide um ponto alvo simples: centro da área (usa z se presente)
-            area = mission_spec.get("area")
-            if area:
-                x1 = area.get("x1", 0.0)
-                y1 = area.get("y1", 0.0)
-                z1 = area.get("z1", 0.0)
-                x2 = area.get("x2", x1)
-                y2 = area.get("y2", y1)
-                z2 = area.get("z2", z1)
-                cx = (x1 + x2) / 2.0
-                cy = (y1 + y2) / 2.0
-                cz = (z1 + z2) / 2.0
-                self.target_point = (cx, cy, cz)
+        # saved last ACK packets we sent back (for duplication)
+        self.last_acks: Dict[str, bytes] = {}
+
+        # mission state
+        self.current_mission: Optional[Dict[str, Any]] = None
+        self.progress_task = None
+
+        # rover simulator (created on assign)
+        self.rover_sim: Optional[RoverSim] = None
+
+        # metrics
+        self.metrics = utils.metrics
+
+        # background task
+        self._task_retransmit = None
+        self._task_cleanup = None
+
+    def connection_made(self, transport):
+        self.transport = transport
+        sockname = transport.get_extra_info("sockname")
+        logger.info(f"ML client {self.rover_id} listening on {sockname}")
+        loop = asyncio.get_event_loop()
+        self._task_retransmit = loop.create_task(self._retransmit_loop())
+        self._task_cleanup = loop.create_task(self._cleanup_loop())
+
+    def connection_lost(self, exc):
+        logger.info("Connection lost")
+        if self._task_retransmit:
+            self._task_retransmit.cancel()
+        if self._task_cleanup:
+            self._task_cleanup.cancel()
+
+    def datagram_received(self, data: bytes, addr):
+        try:
+            envelope = ml_schema.parse_envelope(data)
+        except Exception as e:
+            logger.warning(f"Failed to parse envelope from {addr}: {e}")
+            return
+
+        header = envelope["header"]
+        body = envelope["body"]
+        msg_id = header["msg_id"]
+        mtype = header["message_type"]
+        sender_rover = header.get("rover_id")
+        logger.debug(f"Received {mtype} msg_id={msg_id} from {addr} rover_id={sender_rover}")
+
+        # dedup inbound
+        if msg_id in self.seen_inbound:
+            logger.debug(f"Duplicate inbound {msg_id} — resend ACK if we have it")
+            ack_pkt = self.last_acks.get(msg_id)
+            if ack_pkt:
+                self.transport.sendto(ack_pkt, addr)
+            return
+        self.seen_inbound[msg_id] = time.time()
+
+        try:
+            if mtype == "MISSION_ASSIGN":
+                # send ACK for assign
+                ack_env = ml_schema.make_ack(msg_id, rover_id=self.rover_id, mission_id=header.get("mission_id"))
+                self._send_ack_immediate(ack_env, addr)
+                # process assign
+                asyncio.get_event_loop().create_task(self._handle_assign(envelope, addr))
+            elif mtype == "ERROR":
+                logger.warning(f"Received ERROR from server: {body}")
+            elif mtype == "ACK":
+                acked = body.get("acked_msg_id")
+                if acked:
+                    self._handle_incoming_ack(acked)
             else:
-                # if no area given, target is offset from current position
-                self.target_point = (self.position[0] + 5.0, self.position[1] + 0.0, self.position[2])
-            # Task-specific initialization
-            task = mission_spec.get("task", "capture_images")
-            params = mission_spec.get("params", {})
-            if task == "collect_samples":
-                # expect depth_mm, sample_count
-                self.current_mission.setdefault("params", {}).setdefault("sample_count", params.get("sample_count", 1))
-            if task == "capture_images":
-                self.current_mission.setdefault("params", {}).setdefault("frames", params.get("frames", 10))
-            if task == "env_analysis":
-                self.current_mission.setdefault("params", {}).setdefault("sampling_rate_s", params.get("sampling_rate_s", 10))
-            # set state to MOVING to approach target
-            self.state = "MOVING"
-            logger.info(f"{self.rover_id}: mission {self.current_mission.get('mission_id')} started, target={self.target_point}")
+                logger.info(f"Unhandled message_type {mtype} from {addr}")
+        except Exception:
+            logger.exception("Error processing inbound datagram")
 
-    def step(self, dt_s: float) -> None:
+    # -------------------------
+    # Outbound helpers
+    # -------------------------
+    def _send_packet(self, packet: bytes, addr: Tuple[str, int]):
+        try:
+            self.transport.sendto(packet, addr)
+            self.metrics.incr("messages_sent")
+        except Exception:
+            logger.exception("Failed to send packet")
+
+    def _enqueue_and_send(self, env: Dict[str, Any], addr: Tuple[str, int], expect_ack: bool = True):
         """
-        Avança a simulação dt_s segundos:
-        - se MOVING: move em direção a target_point a self.speed_m_s
-        - ao chegar ao alvo: executa a ação conforme task (sampling/imaging/analysis) progressivamente
-        - consome bateria por segundo conforme atividade
-        - injeta falhas probabilísticas
+        Envia um envelope e regista como pending se expect_ack == True.
         """
-        with self._lock:
-            if self.state in ("IDLE", "CHARGING", "ERROR", "COMPLETED"):
-                # minimal idle or not executing
-                self._idle_drain(dt_s)
-                return
-
-            # Random system failure check
-            if random.random() < 1 - math.pow((1 - self.p_system_fail), dt_s):
-                self._set_error("E-SYS-01", "system_error", "Random system failure")
-                return
-
-            if self.state == "MOVING":
-                self._move_towards_target(dt_s)
-            elif self.state == "SAMPLING":
-                self._perform_sampling(dt_s)
-            elif self.state == "CAPTURING":
-                self._perform_capture(dt_s)
-            elif self.state == "ANALYZING":
-                self._perform_analysis(dt_s)
-            # battery checks
-            if self.battery_level_pct <= 5.0:
-                self._set_error("E-BATT-LOW", "battery", "Battery critically low")
-                return
-
-    def _idle_drain(self, dt_s: float) -> None:
-        drain = 0.001 * dt_s  # 0.001% per second idle
-        self.battery_level_pct = max(0.0, self.battery_level_pct - drain)
-
-    def _move_towards_target(self, dt_s: float) -> None:
-        if not self.target_point:
-            self.state = "IDLE"
-            return
-        tx, ty, tz = self.target_point
-        x, y, z = self.position
-        dx = tx - x
-        dy = ty - y
-        dz = tz - z
-        dist = math.sqrt(dx * dx + dy * dy + dz * dz)
-        if dist < 0.1:
-            # reached
-            self.position = (tx, ty, tz)
-            # transition to task-specific action
-            task = self.current_mission.get("task", "capture_images")
-            if task == "collect_samples":
-                self.state = "SAMPLING"
-            elif task == "capture_images":
-                self.state = "CAPTURING"
-            else:
-                self.state = "ANALYZING"
-            logger.info(f"{self.rover_id}: reached target, switching to {self.state}")
+        try:
+            packet = ml_schema.envelope_to_bytes(env)
+        except Exception:
+            logger.exception("Failed to serialize envelope")
             return
 
-        # possible locomotion failure during movement
-        if random.random() < 1 - math.pow((1 - self.p_move_fail), dt_s):
-            self._set_error("E-LOC-01", "locomotion", "Locomotion failure while moving")
+        header = env["header"]
+        msg_id = header["msg_id"]
+        now = time.time()
+        timeout = config.TIMEOUT_TX_INITIAL
+        pending = PendingSend(msg_id=msg_id, packet=packet, addr=addr, created_at=now, timeout_s=timeout)
+        pending.attempts = 1
+        pending.next_timeout = now + timeout
+        if expect_ack:
+            self.pending[msg_id] = pending
+        # send immediately
+        self._send_packet(packet, addr)
+        logger.debug(f"Sent {header['message_type']} msg_id={msg_id} to {addr} (attempt 1)")
+
+    def _send_ack_immediate(self, ack_env: Dict[str, Any], addr: Tuple[str, int]):
+        """
+        Envia ACK sem ser subject to pending retransmit logic. Guarda packet para re-sending on dup.
+        """
+        try:
+            packet = ml_schema.envelope_to_bytes(ack_env)
+            self.transport.sendto(packet, addr)
+            # store last ack keyed by the original msg_id it acknowledges
+            acked = ack_env["body"].get("acked_msg_id")
+            if acked:
+                self.last_acks[acked] = packet
+            logger.debug(f"Sent immediate ACK for {acked} to {addr}")
+        except Exception:
+            logger.exception("Failed to send immediate ACK")
+
+    # -------------------------
+    # High-level actions
+    # -------------------------
+    async def request_mission(self, server_addr: Tuple[str, int]):
+        """
+        Envia REQUEST_MISSION e espera por MISSION_ASSIGN (ou ERROR).
+        Usa pending/retransmit para assegurar entrega (but request itself here not tracked with ACK).
+        """
+        body = {
+            "capabilities": ["sampling", "imaging", "env"],
+            "battery_level_pct": 100,
+            "position": {"x": 0.0, "y": 0.0, "z": 0.0},
+            "status": "idle",
+        }
+        env = ml_schema.build_envelope("REQUEST_MISSION", body=body, rover_id=self.rover_id)
+        # We can choose to expect ACK for request, but server will reply with ASSIGN or ERROR
+        self._enqueue_and_send(env, server_addr, expect_ack=False)
+        # Note: server will respond with MISSION_ASSIGN, which our datagram_received handles
+
+    async def _handle_assign(self, envelope: Dict[str, Any], addr: Tuple[str, int]):
+        """
+        Processa MISSION_ASSIGN: cria/atualiza RoverSim, inicia loop de progressos que usa o simulador.
+        """
+        header = envelope["header"]
+        body = envelope["body"]
+        mission_id = body.get("mission_id")
+        logger.info(f"Mission assigned: {mission_id}, task={body.get('task')} params={body.get('params')}")
+        # store mission
+        self.current_mission = {
+            "mission_id": mission_id,
+            "task": body.get("task"),
+            "params": body.get("params", {}),
+            "update_interval_s": body.get("update_interval_s", config.DEFAULT_UPDATE_INTERVAL_S),
+        }
+        # create or reset rover_sim
+        if self.rover_sim is None:
+            # instantiate with current position (0,0,0) or could load persisted pos
+            self.rover_sim = RoverSim(self.rover_id, position=(0.0, 0.0, 0.0))
+        # prepare mission_spec expected by RoverSim.start_mission
+        mission_spec = {
+            "mission_id": mission_id,
+            "area": body.get("area"),
+            "task": body.get("task"),
+            "params": body.get("params", {}),
+            "update_interval_s": body.get("update_interval_s", config.DEFAULT_UPDATE_INTERVAL_S),
+        }
+        self.rover_sim.start_mission(mission_spec)
+
+        # start progress loop (cancel previous if any)
+        if self.progress_task and not self.progress_task.done():
+            self.progress_task.cancel()
+        loop = asyncio.get_event_loop()
+        self.progress_task = loop.create_task(self._progress_loop(addr))
+
+    async def _progress_loop(self, server_addr: Tuple[str, int]):
+        """
+        Envia PROGRESS periodicamente usando telemetria do RoverSim.
+        Também gere envio de ERROR e MISSION_COMPLETE conforme o estado do simulador.
+        """
+        if not self.rover_sim or not self.current_mission:
+            logger.warning("Progress loop started without rover_sim or current_mission")
             return
 
-        # move proportional to dt_s
-        travel = min(self.speed_m_s * dt_s, dist)
-        nx = x + (dx / dist) * travel
-        ny = y + (dy / dist) * travel
-        nz = z + (dz / dist) * travel
-        self.position = (nx, ny, nz)
-        # battery drain per meter
-        energy_cost = 0.02 * travel  # 0.02% per meter
-        self.battery_level_pct = max(0.0, self.battery_level_pct - energy_cost)
-        logger.debug(f"{self.rover_id}: moved to {self.position} battery={self.battery_level_pct:.2f}%")
+        update_interval = self.current_mission.get("update_interval_s", config.DEFAULT_UPDATE_INTERVAL_S)
+        try:
+            while self.current_mission:
+                # advance simulation by update_interval seconds (can be replaced by smaller steps if desired)
+                self.rover_sim.step(update_interval)
+                tel = self.rover_sim.get_telemetry()
+                # Build PROGRESS envelope from telemetry (body fields compatible)
+                body = {
+                    "mission_id": tel.get("mission_id"),
+                    "progress_pct": tel.get("progress_pct"),
+                    "position": tel.get("position"),
+                    "battery_level_pct": tel.get("battery_level_pct"),
+                    "status": tel.get("status"),
+                    "errors": tel.get("last_error") and [tel.get("last_error")] or [],
+                    "samples_collected": tel.get("samples_collected", 0),
+                }
+                env = ml_schema.build_envelope("PROGRESS", body=body, rover_id=self.rover_id, mission_id=tel.get("mission_id"))
+                # send and expect ACK for progress
+                self._enqueue_and_send(env, server_addr, expect_ack=True)
 
-    def _perform_sampling(self, dt_s: float) -> None:
-        """
-        Simula perfuração/amostragem — cada sample leva uma certa duração.
-        """
-        params = self.current_mission.get("params", {})
-        sample_count = int(params.get("sample_count", 1))
-        # simple: collect one sample per call and consume energy
-        if self.samples_collected < sample_count:
-            # chance of sample failure
-            if random.random() < 1 - math.pow((1 - self.p_sample_fail), dt_s):
-                self._set_error("E-SAMPLE-01", "sampling", "Sampling tool failure")
-                return
-            # collect one sample
-            self.samples_collected += 1
-            self.payload_capacity_pct = max(0.0, self.payload_capacity_pct - (100.0 / max(1, sample_count)))
-            # energy cost fixed per sample
-            self.battery_level_pct = max(0.0, self.battery_level_pct - 2.0)
-            logger.info(f"{self.rover_id}: collected sample {self.samples_collected}/{sample_count} battery={self.battery_level_pct:.1f}%")
-            # simulate some time cost by leaving state as SAMPLING; caller should call step later
+                # If simulator reported an error, send ERROR envelope (non-blocking)
+                if tel.get("last_error"):
+                    err_body = {
+                        "code": tel["last_error"].get("code"),
+                        "description": tel["last_error"].get("description"),
+                        "severity": "critical",
+                    }
+                    err_env = ml_schema.build_envelope("ERROR", body=err_body, rover_id=self.rover_id, mission_id=tel.get("mission_id"))
+                    # send error but do not block on ACK here (we can expect ACK)
+                    self._enqueue_and_send(err_env, server_addr, expect_ack=True)
+                    # After reporting an error, break or let the server instruct next steps. Here we break progress loop.
+                    # The server may respond with MISSION_CANCEL or other instruction.
+                    logger.info("Reported ERROR to server, halting progress loop pending server instruction")
+                    # keep current_mission but exit loop to avoid duplicate error reports
+                    break
+
+                # If mission completed in simulator, send MISSION_COMPLETE
+                if self.rover_sim.is_mission_complete():
+                    # prepare complete body with realistic info
+                    complete_body = {
+                        "mission_id": tel.get("mission_id"),
+                        "result": "success",
+                        "samples_collected": tel.get("samples_collected", 0),
+                        "info": "simulated completion",
+                    }
+                    complete_env = ml_schema.build_envelope("MISSION_COMPLETE", body=complete_body, rover_id=self.rover_id, mission_id=tel.get("mission_id"))
+                    self._enqueue_and_send(complete_env, server_addr, expect_ack=True)
+                    # clear mission state locally
+                    self.current_mission = None
+                    logger.info("Mission complete sent to server")
+                    break
+
+                # sleep until next update interval (allowing other tasks to run)
+                await asyncio.sleep(update_interval)
+        except asyncio.CancelledError:
+            logger.info("Progress loop cancelled")
+        except Exception:
+            logger.exception("Error in progress loop")
+
+    def _last_progress_pct(self, mission_id: str) -> float:
+        # deprecated now that RoverSim produces telemetry
+        return 0.0
+
+    # -------------------------
+    # Incoming ACK handling
+    # -------------------------
+    def _handle_incoming_ack(self, acked_msg_id: str):
+        po = self.pending.pop(acked_msg_id, None)
+        if po:
+            elapsed = time.time() - po.created_at
+            logger.info(f"Received ACK for {acked_msg_id} (attempts={po.attempts} elapsed={elapsed:.2f}s)")
+            self.metrics.incr("acks_received")
         else:
-            # finished sampling
-            self.mission_progress_pct = 100.0
-            self.state = "COMPLETED"
-            logger.info(f"{self.rover_id}: sampling mission completed")
+            logger.debug(f"ACK for unknown msg {acked_msg_id}")
 
-    def _perform_capture(self, dt_s: float) -> None:
-        """
-        Simula captura de imagens — frames progress increment.
-        """
-        params = self.current_mission.get("params", {})
-        frames = int(params.get("frames", 10))
-        # approximate frames captured per dt_s based on small rate
-        rate = max(1.0, frames / max(1.0, params.get("duration_s", frames)))  # fallback
-        # capture a few frames
-        frames_done = int(min(frames, self.current_mission.get("params", {}).get("_frames_done", 0) + max(1, int(rate * dt_s))))
-        self.current_mission["params"]["_frames_done"] = frames_done
-        # energy cost per frame
-        self.battery_level_pct = max(0.0, self.battery_level_pct - 0.1 * (frames_done - self.current_mission["params"].get("_frames_prev", 0)))
-        self.current_mission["params"]["_frames_prev"] = frames_done
-        logger.debug(f"{self.rover_id}: captured frames {frames_done}/{frames} battery={self.battery_level_pct:.2f}%")
-        if frames_done >= frames:
-            self.mission_progress_pct = 100.0
-            self.state = "COMPLETED"
-            logger.info(f"{self.rover_id}: imaging mission completed")
+    # -------------------------
+    # Retransmit & cleanup loops
+    # -------------------------
+    async def _retransmit_loop(self):
+        try:
+            while True:
+                now = time.time()
+                for msg_id, po in list(self.pending.items()):
+                    if now >= po.next_timeout:
+                        if po.attempts <= config.N_RETX:
+                            # retransmit
+                            try:
+                                self.transport.sendto(po.packet, po.addr)
+                                po.attempts += 1
+                                # exponential backoff
+                                po.next_timeout = now + (po.base_timeout * (config.BACKOFF_FACTOR ** (po.attempts - 1)))
+                                logger.warning(f"Retransmit {msg_id} attempt={po.attempts}")
+                                self.metrics.incr("retransmits")
+                            except Exception:
+                                logger.exception("Failed retransmit")
+                        else:
+                            # retries exhausted
+                            logger.error(f"Retries exhausted for {msg_id}")
+                            # remove pending and take fallback action (log / notify)
+                            self.pending.pop(msg_id, None)
+                await asyncio.sleep(0.5)
+        except asyncio.CancelledError:
+            logger.info("_retransmit_loop cancelled")
+        except Exception:
+            logger.exception("Error in retransmit loop")
+            raise
 
-    def _perform_analysis(self, dt_s: float) -> None:
-        """
-        Simula análise ambiental — acumula progress proporcional ao sampling_rate.
-        """
-        params = self.current_mission.get("params", {})
-        sampling_rate = float(params.get("sampling_rate_s", 10.0))
-        # progress increment per dt_s: dt_s / (expected_duration)
-        expected_duration = params.get("expected_duration_s", sampling_rate * 5.0)
-        inc = (dt_s / max(1.0, expected_duration)) * 100.0
-        self.mission_progress_pct = min(100.0, self.mission_progress_pct + inc)
-        # energy cost small
-        self.battery_level_pct = max(0.0, self.battery_level_pct - 0.01 * dt_s)
-        logger.debug(f"{self.rover_id}: analysis progress {self.mission_progress_pct:.2f}% battery={self.battery_level_pct:.2f}%")
-        if self.mission_progress_pct >= 100.0:
-            self.state = "COMPLETED"
-            logger.info(f"{self.rover_id}: analysis mission completed")
+    async def _cleanup_loop(self):
+        try:
+            while True:
+                # cleanup seen_inbound
+                cutoff = time.time() - config.DEDUPE_RETENTION_S
+                old = [mid for mid, ts in self.seen_inbound.items() if ts < cutoff]
+                for mid in old:
+                    self.seen_inbound.pop(mid, None)
+                await asyncio.sleep(config.DEDUPE_CLEANUP_INTERVAL_S)
+        except asyncio.CancelledError:
+            logger.info("_cleanup_loop cancelled")
+        except Exception:
+            logger.exception("Error in cleanup loop")
+            raise
 
-    def _set_error(self, code: str, category: str, description: str) -> None:
-        self.last_error = {"code": code, "category": category, "description": description, "timestamp": utils.now_iso()}
-        self.state = "ERROR"
-        logger.warning(f"{self.rover_id}: ERROR {code} - {description}")
 
-    def inject_failure(self, kind: str) -> None:
-        """
-        Forçar uma falha específica: kind in {"locomotion","sampling","system","battery"}.
-        """
-        if kind == "locomotion":
-            self._set_error("E-LOC-01", "locomotion", "Forced locomotion failure")
-        elif kind == "sampling":
-            self._set_error("E-SAMPLE-01", "sampling", "Forced sampling failure")
-        elif kind == "system":
-            self._set_error("E-SYS-01", "system", "Forced system failure")
-        elif kind == "battery":
-            self.battery_level_pct = 0.0
-            self._set_error("E-BATT-LOW", "battery", "Forced battery drain")
-        else:
-            logger.warning("Unknown failure kind requested")
+# -------------------------
+# CLI / Entrypoint
+# -------------------------
+import argparse
 
-    def is_mission_complete(self) -> bool:
-        return self.state == "COMPLETED"
 
-    def get_telemetry(self) -> Dict[str, Any]:
-        """
-        Retorna um dicionário com os campos sugeridos para PROGRESS / TELEMETRY bodies.
-        """
-        with self._lock:
-            telemetry = {
-                "position": {"x": round(self.position[0], 3), "y": round(self.position[1], 3), "z": round(self.position[2], 3)},
-                "battery_level_pct": round(self.battery_level_pct, 2),
-                "payload_capacity_pct": round(self.payload_capacity_pct, 2),
-                "mission_id": self.current_mission.get("mission_id") if self.current_mission else None,
-                "progress_pct": round(self.mission_progress_pct, 2),
-                "status": self.state.lower(),
-                "samples_collected": self.samples_collected,
-                "last_error": self.last_error,
-            }
-            return telemetry
+async def main(args):
+    loop = asyncio.get_event_loop()
+    rover_id = args.rover_id
+    server_host = args.server
+    server_port = args.port
 
-    # --- Simple demo / standalone runner ---------------------------------
-def _demo_run():
-    rs = RoverSim("R-001", position=(0.0, 0.0, 0.0))
-    mission = {
-        "mission_id": "M-DEM0",
-        "area": {"x1": 5, "y1": -2, "z1": 0, "x2": 10, "y2": 3, "z2": 0},
-        "task": "collect_samples",
-        "params": {"sample_count": 3},
-        "update_interval_s": 2,
-    }
-    rs.start_mission(mission)
-    start = time.time()
+    connect_addr = (server_host, server_port)
+    logger.info(f"Starting ML client {rover_id} -> server {connect_addr}")
+
+    # create protocol and endpoint
+    transport, protocol = await loop.create_datagram_endpoint(lambda: MLClientProtocol(rover_id), remote_addr=None)
+    proto: MLClientProtocol = protocol
+
+    # request mission
+    await proto.request_mission(connect_addr)
+
+    # keep running (progress loop will start when assign arrives)
     try:
-        while not rs.is_mission_complete() and rs.state != "ERROR" and time.time() - start < 600:
-            rs.step(1.0)
-            tel = rs.get_telemetry()
-            logger.info(f"TELEMETRY: {tel}")
-            time.sleep(1.0)
-        logger.info("Demo finished. final telemetry:")
-        logger.info(rs.get_telemetry())
+        while True:
+            await asyncio.sleep(1)
     except KeyboardInterrupt:
-        logger.info("Demo interrupted")
+        logger.info("Client shutting down")
+    finally:
+        transport.close()
 
 
 if __name__ == "__main__":
-    import argparse
-
-    parser = argparse.ArgumentParser(description="RoverSim demo runner")
-    parser.add_argument("--demo", action="store_true", help="Run demo mission locally")
-    parser.add_argument("--seed", type=int, default=None, help="Random seed for reproducibility")
+    parser = argparse.ArgumentParser(description="MissionLink ML client (Rover) with RoverSim")
+    parser.add_argument("--rover-id", required=True, help="Rover identifier (e.g. R-001)")
+    parser.add_argument("--server", default="127.0.0.1", help="Nave-Mãe IP/hostname")
+    parser.add_argument("--port", type=int, default=config.ML_UDP_PORT, help="Nave-Mãe ML UDP port")
     args = parser.parse_args()
-    if args.seed is not None:
-        random.seed(args.seed)
-    if args.demo:
-        _demo_run()
-    else:
-        print("Run with --demo to execute a sample mission")
+    try:
+        asyncio.run(main(args))
+    except Exception:
+        traceback.print_exc()
