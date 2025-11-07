@@ -3,14 +3,14 @@
 ml_client.py
 MissionLink (ML) UDP client (Rover) implementation integrated with RoverSim.
 
-Updated: adds handling for MISSION_CANCEL and a simple fallback when pending retransmits exhaust.
-Also adds --exit-on-complete CLI option: when set the client will exit automatically after
-the assigned mission completes (useful for automated tests).
+Atualizado: quando retransmits esgotam para PROGRESS/MISSION_COMPLETE, marcamos missão AT_RISK
+e persistimos o pacote não entregue para possível recuperação.
 """
 
 import asyncio
 import time
 import socket
+import os
 from typing import Dict, Any, Optional, Tuple
 import traceback
 
@@ -62,7 +62,7 @@ class MLClientProtocol(asyncio.DatagramProtocol):
         # simple backoff generator for re-requesting mission on failures
         self._re_request_backoff = utils.exponential_backoff(base=1.0, factor=2.0, max_delay=30.0)
 
-        # exit-on-complete behavior: if True, set done_event when mission completes to allow main to exit
+        # exit-on-complete behavior: if True, set done_event when the mission completes (if requested)
         self.exit_on_complete = exit_on_complete
         self.done_event = done_event
 
@@ -353,19 +353,34 @@ class MLClientProtocol(asyncio.DatagramProtocol):
         """
         Simple fallback policy when a message exhausts retransmits:
          - If message_type is PROGRESS or MISSION_COMPLETE: log and try to re-request a mission after backoff.
-         - If message_type is ERROR: escalate via log.
-         - Otherwise: log.
-        This is a conservative policy; adapt as needed.
+         - Persist undelivered packet to disk for later inspection.
         """
         mtype = pending.message_type
         if mtype in ("PROGRESS", "MISSION_COMPLETE"):
+            # mark local mission as at-risk
+            try:
+                if self.current_mission and self.current_mission.get("mission_id") == getattr(pending, "mission_id", None):
+                    self.current_mission["state"] = "AT_RISK"
+            except Exception:
+                pass
+
+            # persist last telemetry as fallback (simple file per rover)
+            try:
+                cache_dir = os.getenv("ML_CLIENT_CACHE_DIR", None) or os.path.join(os.path.expanduser("~"), ".ml_client_cache")
+                os.makedirs(cache_dir, exist_ok=True)
+                fname = os.path.join(cache_dir, f"{self.rover_id}-{pending.msg_id}.bin")
+                with open(fname, "wb") as f:
+                    f.write(pending.packet)
+                logger.info(f"Persisted undelivered packet to {fname}")
+            except Exception:
+                logger.exception("Failed to persist undelivered packet")
+
             # try to re-request mission after backoff
             delay = next(self._re_request_backoff)
             logger.warning(f"On send-failure of {mtype}, will attempt to re-request mission after {delay:.1f}s")
             asyncio.get_event_loop().create_task(self._delayed_re_request(delay, pending.addr))
         elif mtype == "ERROR":
             logger.error("Critical ERROR message could not be delivered; logging and continuing")
-            # If tests expect exit-on-complete, signal done_event so test doesn't hang
             if self.exit_on_complete and self.done_event:
                 try:
                     self.done_event.set()

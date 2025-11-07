@@ -3,31 +3,13 @@
 ml_server.py
 Implementação MissionLink (ML) UDP server (Nave-Mãe)
 
-Funcionalidades implementadas nesta versão:
-- Asyncio UDP server (DatagramProtocol) para receber envelopes ML.
-- Parse/validação de envelopes usando common/ml_schema.
-- Deduplicação de mensagens recebidas (cache com retenção).
-- Envio de ACKs automáticos para mensagens recebidas que requerem confirmação.
-- Mecanismo de envio confiável para mensagens emitidas pelo servidor (pending_outgoing
-  com retransmissão exponencial até N_RETX).
-- Integração mínima com mission_store (interface esperada documentada abaixo).
-- Logging e métricas simples.
-
-Observações:
-- Requer os ficheiros em /src/common (ml_schema.py, config.py, utils.py).
-- Espera encontrar um módulo nave_mae.mission_store com a classe MissionStore.
-  Se não existir, o módulo cria um mission_store mínimo local (in-memory) para propósitos
-  de desenvolvimento/testes.
-- Para testes locais podes executar este ficheiro e depois usar o rover client para interagir.
-
-Como usar (exemplo rápido):
-  PYTHONPATH=src python3 src/nave_mae/ml_server.py
-
-O servidor escuta na porta configurada em common.config.ML_UDP_PORT (default 50000).
+Atualizado: PendingOutgoing guarda message_type/mission_id; adicionada lógica para envio de
+MISSION_CANCEL e processamento de ACKs de cancelamento para marcar missão como CANCELLED.
 """
 
 import asyncio
 import time
+import contextlib
 from typing import Dict, Any, Optional, Tuple
 import traceback
 
@@ -44,15 +26,6 @@ except Exception:
     class MissionStore:
         """
         Minimal fallback mission store for development.
-        API methods used by ml_server:
-         - register_rover(rover_id, address)
-         - get_pending_mission_for_rover(rover_id) -> mission dict or None
-         - assign_mission_to_rover(mission, rover_id)
-         - update_progress(mission_id, rover_id, progress_payload)
-         - complete_mission(mission_id, rover_id, result_payload)
-         - create_mission(mission_spec) -> mission_id
-         - list_missions()
-        This simple store does NOT persist data.
         """
         def __init__(self):
             self.missions: Dict[str, Dict[str, Any]] = {}
@@ -76,7 +49,6 @@ except Exception:
             return mid
 
         def get_pending_mission_for_rover(self, rover_id: str) -> Optional[Dict[str, Any]]:
-            # return first unassigned mission
             for m in self.missions.values():
                 if m.get("assigned_rover") is None:
                     return m
@@ -106,12 +78,44 @@ except Exception:
         def list_missions(self):
             return list(self.missions.values())
 
+        def get_mission(self, mission_id: str):
+            return self.missions.get(mission_id)
+
+        def unassign_mission(self, mission_id: str, reason: Optional[str] = None):
+            m = self.missions.get(mission_id)
+            if not m:
+                return
+            prev = m.get("assigned_rover")
+            m["assigned_rover"] = None
+            m["state"] = "CREATED"
+            m.setdefault("history", []).append({"ts": utils.now_iso(), "type": "ASSIGN_FAILED", "reason": reason})
+            if prev:
+                self.rovers.setdefault(prev, {})["state"] = "IDLE"
+
+        def cancel_mission(self, mission_id: str, reason: Optional[str] = None):
+            m = self.missions.get(mission_id)
+            if not m:
+                return
+            prev = m.get("assigned_rover")
+            m.setdefault("history", []).append({"ts": utils.now_iso(), "type": "CANCEL", "reason": reason})
+            m["state"] = "CANCELLED"
+            m["cancelled_at"] = utils.now_iso()
+            if prev:
+                self.rovers.setdefault(prev, {})["state"] = "IDLE"
+
+        def get_rover(self, rover_id: str):
+            return self.rovers.get(rover_id)
+
 
 class PendingOutgoing:
     """
     Representa uma mensagem enviada pelo servidor que aguarda ACK.
+
+    Guarda message_type e mission_id (quando disponíveis) para permitir
+    decisão de política quando retries esgotam.
     """
-    def __init__(self, msg_id: str, packet: bytes, addr: Tuple[str, int], created_at: float, timeout_s: float):
+    def __init__(self, msg_id: str, packet: bytes, addr: Tuple[str, int], created_at: float, timeout_s: float,
+                 message_type: Optional[str] = None, mission_id: Optional[str] = None):
         self.msg_id = msg_id
         self.packet = packet
         self.addr = addr
@@ -119,6 +123,9 @@ class PendingOutgoing:
         self.next_timeout = created_at + timeout_s
         self.attempts = 0
         self.timeout_s = timeout_s
+        # additional metadata
+        self.message_type = message_type
+        self.mission_id = mission_id
 
 
 class MLServerProtocol(asyncio.DatagramProtocol):
@@ -218,8 +225,6 @@ class MLServerProtocol(asyncio.DatagramProtocol):
                 logger.warning(f"Received ERROR from {rover_id}@{addr}: {body}")
                 # react if needed
             elif mtype == "HEARTBEAT":
-                # optional RTT measurement; if body contains nonce, reply ack
-                nonce = body.get("nonce")
                 ack_env = ml_schema.make_ack(msg_id, rover_id=rover_id, mission_id=header.get("mission_id"))
                 self._send_ack_immediate(ack_env, addr)
             else:
@@ -240,7 +245,6 @@ class MLServerProtocol(asyncio.DatagramProtocol):
         # Simple policy: pick a pending mission from mission_store
         pending = self.mission_store.get_pending_mission_for_rover(rover_id)
         if pending is None:
-            # No mission available: reply with ERROR or a MISSION_ASSIGN with empty body?
             err_body = {"code": "E-NO-MISSION", "description": "No mission available"}
             err_env = ml_schema.build_envelope("ERROR", body=err_body, rover_id=rover_id)
             self._send_with_reliability(err_env, addr)
@@ -252,8 +256,6 @@ class MLServerProtocol(asyncio.DatagramProtocol):
         except Exception:
             logger.exception("Failed to assign mission in mission_store")
 
-        # Build MISSION_ASSIGN envelope using mission contents
-        # Ensure update_interval_s is a valid value (not None)
         ui = pending.get("update_interval_s") or config.DEFAULT_UPDATE_INTERVAL_S
 
         assign_body = {
@@ -303,14 +305,10 @@ class MLServerProtocol(asyncio.DatagramProtocol):
     # Sending utilities
     # -------------------------
     def _send_ack_immediate(self, ack_env: Dict[str, Any], addr):
-        """
-        Envia um ACK imediatamente (não sujeito a retransmit logic do servidor).
-        Guarda o ack packet para resposta a duplicados.
-        """
         try:
             packet = ml_schema.envelope_to_bytes(ack_env)
-            self.transport.sendto(packet, addr)
-            # record last ack for the referenced msg_id (body.acked_msg_id)
+            if self.transport:
+                self.transport.sendto(packet, addr)
             acked = ack_env["body"].get("acked_msg_id")
             if acked:
                 self.last_acks[acked] = packet
@@ -319,9 +317,6 @@ class MLServerProtocol(asyncio.DatagramProtocol):
             logger.exception(f"Failed to send immediate ACK to {addr}: {e}")
 
     def _send_with_reliability(self, env: Dict[str, Any], addr: Tuple[str, int]):
-        """
-        Send a message and track it in pending_outgoing until an ACK is received or retries exhausted.
-        """
         try:
             packet = ml_schema.envelope_to_bytes(env)
         except Exception as e:
@@ -330,41 +325,96 @@ class MLServerProtocol(asyncio.DatagramProtocol):
 
         header = env["header"]
         msg_id = header["msg_id"]
+        msg_type = header.get("message_type")
+        mission_id = header.get("mission_id")
 
-        # Create pending entry
         now = time.time()
         timeout = config.TIMEOUT_TX_INITIAL
-        po = PendingOutgoing(msg_id=msg_id, packet=packet, addr=addr, created_at=now, timeout_s=timeout)
+        po = PendingOutgoing(msg_id=msg_id, packet=packet, addr=addr, created_at=now, timeout_s=timeout,
+                             message_type=msg_type, mission_id=mission_id)
         self.pending_outgoing[msg_id] = po
 
-        # send first time immediately
         try:
-            self.transport.sendto(packet, addr)
+            if self.transport:
+                self.transport.sendto(packet, addr)
             po.attempts += 1
             logger.debug(f"Sent msg_id={msg_id} to {addr} (attempt {po.attempts})")
             self.metrics.incr("messages_sent")
         except Exception:
             logger.exception(f"Failed to send packet to {addr}")
 
+    def send_mission_cancel(self, mission_id: str, reason: Optional[str] = None) -> Optional[str]:
+        """
+        Request the assigned rover to cancel a mission by sending MISSION_CANCEL reliably.
+        Returns the msg_id of the pending cancel (if sent) or None if no assigned rover/address known.
+        """
+        m = self.mission_store.get_mission(mission_id)
+        if not m:
+            logger.warning(f"send_mission_cancel: unknown mission {mission_id}")
+            return None
+        assigned = m.get("assigned_rover")
+        if not assigned:
+            logger.info(f"send_mission_cancel: mission {mission_id} not assigned; marking cancelled locally")
+            try:
+                self.mission_store.cancel_mission(mission_id, reason=reason or "cancel_requested")
+            except Exception:
+                logger.exception("mission_store.cancel_mission failed")
+            return None
+
+        # find rover address (mission_store should have registered rover info)
+        rover_info = None
+        try:
+            rover_info = self.mission_store.get_rover(assigned)
+        except Exception:
+            logger.exception("mission_store.get_rover failed")
+
+        if not rover_info:
+            logger.warning(f"send_mission_cancel: no rover info for {assigned}, marking cancelled locally")
+            try:
+                self.mission_store.cancel_mission(mission_id, reason=reason or "cancel_requested")
+            except Exception:
+                logger.exception("mission_store.cancel_mission failed")
+            return None
+
+        addr = (rover_info.get("address", {}).get("ip"), int(rover_info.get("address", {}).get("port")))
+        if not addr or not addr[0]:
+            logger.warning(f"send_mission_cancel: invalid address for rover {assigned}: {rover_info.get('address')}")
+            try:
+                self.mission_store.cancel_mission(mission_id, reason=reason or "cancel_requested")
+            except Exception:
+                logger.exception("mission_store.cancel_mission failed")
+            return None
+
+        body = {"mission_id": mission_id, "reason": reason}
+        env = ml_schema.build_envelope("MISSION_CANCEL", body=body, rover_id=None, mission_id=mission_id)
+        logger.info(f"Sending MISSION_CANCEL for {mission_id} to {assigned}@{addr}")
+        self._send_with_reliability(env, addr)
+        return env["header"]["msg_id"]
+
     def _handle_incoming_ack(self, acked_msg_id: str, addr):
         """
         Trata ACK recebido pelo servidor, removendo pending_outgoing e registando métricas.
+        Também aplica ações específicas quando o ACK confirma um MISSION_CANCEL.
         """
         po = self.pending_outgoing.pop(acked_msg_id, None)
         if po:
             elapsed = time.time() - po.created_at
             logger.info(f"Received ACK for {acked_msg_id} from {addr} (attempts={po.attempts} elapsed={elapsed:.2f}s)")
             self.metrics.incr("acks_received")
+            # if this ACK acknowledges a cancel we sent, mark mission cancelled in mission_store
+            try:
+                if po.message_type == "MISSION_CANCEL" and po.mission_id:
+                    try:
+                        self.mission_store.cancel_mission(po.mission_id, reason="cancel_ack_received")
+                        logger.info(f"Mission {po.mission_id} marked CANCELLED after ACK from {addr}")
+                    except Exception:
+                        logger.exception("mission_store.cancel_mission failed on cancel ACK")
+            except Exception:
+                logger.exception("Error handling special ACK case")
         else:
             logger.debug(f"Received ACK for unknown or already-handled msg {acked_msg_id}")
 
-    # -------------------------
-    # Background tasks
-    # -------------------------
     async def _retransmit_loop(self):
-        """
-        Periodic task that checks pending_outgoing for timeouts and retransmits.
-        """
         try:
             while True:
                 now = time.time()
@@ -372,22 +422,50 @@ class MLServerProtocol(asyncio.DatagramProtocol):
                 for msg_id, po in list(self.pending_outgoing.items()):
                     if now >= po.next_timeout:
                         if po.attempts <= config.N_RETX:
-                            # retransmit
                             try:
-                                self.transport.sendto(po.packet, po.addr)
+                                if self.transport:
+                                    self.transport.sendto(po.packet, po.addr)
                                 po.attempts += 1
-                                # update next timeout with exponential backoff
                                 po.next_timeout = now + (po.timeout_s * (config.BACKOFF_FACTOR ** (po.attempts - 1)))
                                 logger.warning(f"Retransmit msg {msg_id} to {po.addr} attempt={po.attempts}")
                                 self.metrics.incr("retransmits")
                             except Exception:
                                 logger.exception(f"Failed retransmit for {msg_id}")
                         else:
-                            # exhausted retries
-                            logger.error(f"Retries exhausted for msg {msg_id} to {po.addr}")
+                            logger.error(f"Retries exhausted for msg {msg_id} to {po.addr} (type={po.message_type})")
+                            try:
+                                if po.message_type == "MISSION_ASSIGN" and po.mission_id:
+                                    if hasattr(self.mission_store, "unassign_mission"):
+                                        self.mission_store.unassign_mission(po.mission_id, reason="undeliverable_assign")
+                                        logger.info(f"Reverted assignment of mission {po.mission_id} after undeliverable ASSIGN to {po.addr}")
+                                    else:
+                                        lock = getattr(self.mission_store, "_lock", contextlib.nullcontext())
+                                        with lock:
+                                            m = getattr(self.mission_store, "_missions", {}).get(po.mission_id)
+                                            if m:
+                                                prev = m.get("assigned_rover")
+                                                m["assigned_rover"] = None
+                                                m["state"] = "CREATED"
+                                                m.setdefault("history", []).append({"ts": utils.now_iso(), "type": "ASSIGN_FAILED", "reason": "undeliverable_assign"})
+                                                if prev:
+                                                    getattr(self.mission_store, "_rovers", {}).setdefault(prev, {})["state"] = "IDLE"
+                                        try:
+                                            if hasattr(self.mission_store, "_emit"):
+                                                self.mission_store._emit("mission_assign_failed", {"mission_id": po.mission_id, "reason": "undeliverable_assign"})
+                                        except Exception:
+                                            pass
+                                        logger.info(f"Reverted assignment (fallback) of mission {po.mission_id}")
+                                    self.metrics.incr("assign_failures")
+                                else:
+                                    try:
+                                        if hasattr(self.mission_store, "_emit"):
+                                            self.mission_store._emit("outgoing_failed", {"msg_id": msg_id, "addr": po.addr, "message_type": po.message_type})
+                                    except Exception:
+                                        logger.exception("Failed to emit outgoing_failed")
+                                    self.metrics.incr("outgoing_failures")
+                            except Exception:
+                                logger.exception("Error in exhausted-retry policy handler")
                             to_remove.append(msg_id)
-                            # Optional: notify mission_store or escalate
-                # remove expired
                 for mid in to_remove:
                     self.pending_outgoing.pop(mid, None)
                 await asyncio.sleep(0.5)
@@ -398,18 +476,13 @@ class MLServerProtocol(asyncio.DatagramProtocol):
             raise
 
     async def _cleanup_loop(self):
-        """
-        Periodic cleanup (dedupe cache, old pending entries).
-        """
         try:
             while True:
                 now = time.time()
-                # cleanup seen_msgs
                 cutoff = now - config.DEDUPE_RETENTION_S
                 old = [mid for mid, ts in self.seen_msgs.items() if ts < cutoff]
                 for mid in old:
                     self.seen_msgs.pop(mid, None)
-                # Optionally cleanup very old pending entries (if attempts exhausted for too long)
                 await asyncio.sleep(config.DEDUPE_CLEANUP_INTERVAL_S)
         except asyncio.CancelledError:
             logger.info("_cleanup_loop cancelled")
@@ -435,7 +508,6 @@ def run_server(listen_host: str = "0.0.0.0", listen_port: int = None):
         logger.info("Shutting down ML server (KeyboardInterrupt)")
     finally:
         transport.close()
-        # cancel tasks
         if proto._task_retransmit:
             proto._task_retransmit.cancel()
         if proto._task_cleanup:

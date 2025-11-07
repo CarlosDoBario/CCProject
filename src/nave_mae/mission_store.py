@@ -8,9 +8,6 @@ Responsabilidades:
 - Gerir informação básica dos rovers: registo, estado, último contacto.
 - Fornecer hooks/callbacks para notificações (ex.: API / SSE).
 - Persistência leve opcional (salvar/load em ficheiro JSON).
-
-Nota: esta implementação é simples, suficiente para prototipagem e testes.
-Pode ser substituída por persistência mais completa (SQLite, etc.) se necessário.
 """
 
 from typing import Dict, Any, Optional, Tuple, Callable, List
@@ -76,6 +73,7 @@ class MissionStore:
       - get_rover(rover_id)
       - snapshot() -> dict (para API/inspeção)
       - load_from_file(path), save_to_file(path)
+      - unassign_mission(mission_id, reason)  <-- novo
     """
 
     def __init__(self, persist_file: Optional[str] = None):
@@ -213,6 +211,26 @@ class MissionStore:
             m.setdefault("history", []).append({"ts": utils.now_iso(), "type": "ASSIGNED", "rover": rover_id})
         logger.info(f"Mission {mid} assigned to {rover_id}")
         self._emit("mission_assigned", {"mission": dict(m), "rover_id": rover_id})
+
+    def unassign_mission(self, mission_id: str, reason: Optional[str] = None) -> None:
+        """
+        Reverte uma atribuição de missão devido a falha de entrega/ comunicação.
+        Define assigned_rover = None e state = 'CREATED' (ou 'ASSIGN_FAILED'), regista history
+        e emite hook 'mission_assign_failed'.
+        """
+        with self._lock:
+            m = self._missions.get(mission_id)
+            if not m:
+                logger.warning(f"unassign_mission: unknown mission {mission_id}")
+                return
+            prev = m.get("assigned_rover")
+            m["assigned_rover"] = None
+            m["state"] = "CREATED"
+            m.setdefault("history", []).append({"ts": utils.now_iso(), "type": "ASSIGN_FAILED", "reason": reason})
+            if prev:
+                self._rovers.setdefault(prev, {})["state"] = "IDLE"
+        logger.info(f"Mission {mission_id} unassigned (reason={reason})")
+        self._emit("mission_assign_failed", {"mission_id": mission_id, "reason": reason, "prev_rover": prev})
 
     def update_progress(self, mission_id: str, rover_id: str, progress_payload: Dict[str, Any]) -> None:
         with self._lock:
