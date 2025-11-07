@@ -1,12 +1,16 @@
+#!/usr/bin/env python3
 """
 ml_client.py
 MissionLink (ML) UDP client (Rover) implementation integrated with RoverSim.
 
 Updated: adds handling for MISSION_CANCEL and a simple fallback when pending retransmits exhaust.
+Also adds --exit-on-complete CLI option: when set the client will exit automatically after
+the assigned mission completes (useful for automated tests).
 """
 
 import asyncio
 import time
+import socket
 from typing import Dict, Any, Optional, Tuple
 import traceback
 
@@ -28,7 +32,7 @@ class PendingSend:
 
 
 class MLClientProtocol(asyncio.DatagramProtocol):
-    def __init__(self, rover_id: str):
+    def __init__(self, rover_id: str, exit_on_complete: bool = False, done_event: Optional[asyncio.Event] = None):
         self.transport = None
         self.rover_id = rover_id
 
@@ -57,6 +61,10 @@ class MLClientProtocol(asyncio.DatagramProtocol):
 
         # simple backoff generator for re-requesting mission on failures
         self._re_request_backoff = utils.exponential_backoff(base=1.0, factor=2.0, max_delay=30.0)
+
+        # exit-on-complete behavior: if True, set done_event when mission completes to allow main to exit
+        self.exit_on_complete = exit_on_complete
+        self.done_event = done_event
 
     def connection_made(self, transport):
         self.transport = transport
@@ -189,12 +197,14 @@ class MLClientProtocol(asyncio.DatagramProtocol):
         header = envelope["header"]
         body = envelope["body"]
         mission_id = body.get("mission_id")
+        # Coalesce update_interval_s to default if None
+        ui = body.get("update_interval_s") or config.DEFAULT_UPDATE_INTERVAL_S
         logger.info(f"Mission assigned: {mission_id}, task={body.get('task')} params={body.get('params')}")
         self.current_mission = {
             "mission_id": mission_id,
             "task": body.get("task"),
             "params": body.get("params", {}),
-            "update_interval_s": body.get("update_interval_s", config.DEFAULT_UPDATE_INTERVAL_S),
+            "update_interval_s": ui,
         }
         # create or reset rover_sim
         if self.rover_sim is None:
@@ -204,7 +214,7 @@ class MLClientProtocol(asyncio.DatagramProtocol):
             "area": body.get("area"),
             "task": body.get("task"),
             "params": body.get("params", {}),
-            "update_interval_s": body.get("update_interval_s", config.DEFAULT_UPDATE_INTERVAL_S),
+            "update_interval_s": ui,
         }
         self.rover_sim.start_mission(mission_spec)
 
@@ -223,6 +233,12 @@ class MLClientProtocol(asyncio.DatagramProtocol):
             if self.rover_sim:
                 self.rover_sim.state = "IDLE"
             logger.info(f"Mission {mission_id} cancelled locally")
+            # If exit_on_complete behavior is enabled, signal done_event so main can exit
+            if self.exit_on_complete and self.done_event:
+                try:
+                    self.done_event.set()
+                except Exception:
+                    pass
 
     async def _progress_loop(self, server_addr: Tuple[str, int]):
         if not self.rover_sim or not self.current_mission:
@@ -232,7 +248,9 @@ class MLClientProtocol(asyncio.DatagramProtocol):
         update_interval = self.current_mission.get("update_interval_s", config.DEFAULT_UPDATE_INTERVAL_S)
         try:
             while self.current_mission:
-                self.rover_sim.step(update_interval)
+                # ensure update_interval is numeric
+                ui = update_interval or config.DEFAULT_UPDATE_INTERVAL_S
+                self.rover_sim.step(ui)
                 tel = self.rover_sim.get_telemetry()
                 body = {
                     "mission_id": tel.get("mission_id"),
@@ -255,6 +273,12 @@ class MLClientProtocol(asyncio.DatagramProtocol):
                     err_env = ml_schema.build_envelope("ERROR", body=err_body, rover_id=self.rover_id, mission_id=tel.get("mission_id"))
                     self._enqueue_and_send(err_env, server_addr, expect_ack=True)
                     logger.info("Reported ERROR to server, halting progress loop pending server instruction")
+                    # signal done_event if configured so tests can exit
+                    if self.exit_on_complete and self.done_event:
+                        try:
+                            self.done_event.set()
+                        except Exception:
+                            pass
                     break
 
                 if self.rover_sim.is_mission_complete():
@@ -268,9 +292,15 @@ class MLClientProtocol(asyncio.DatagramProtocol):
                     self._enqueue_and_send(complete_env, server_addr, expect_ack=True)
                     self.current_mission = None
                     logger.info("Mission complete sent to server")
+                    # If exit-on-complete requested, notify main to exit
+                    if self.exit_on_complete and self.done_event:
+                        try:
+                            self.done_event.set()
+                        except Exception:
+                            pass
                     break
 
-                await asyncio.sleep(update_interval)
+                await asyncio.sleep(ui)
         except asyncio.CancelledError:
             logger.info("Progress loop cancelled")
         except Exception:
@@ -335,6 +365,12 @@ class MLClientProtocol(asyncio.DatagramProtocol):
             asyncio.get_event_loop().create_task(self._delayed_re_request(delay, pending.addr))
         elif mtype == "ERROR":
             logger.error("Critical ERROR message could not be delivered; logging and continuing")
+            # If tests expect exit-on-complete, signal done_event so test doesn't hang
+            if self.exit_on_complete and self.done_event:
+                try:
+                    self.done_event.set()
+                except Exception:
+                    pass
         else:
             logger.error(f"Unacknowledged message {pending.msg_id} of type {mtype}")
 
@@ -372,18 +408,37 @@ async def main(args):
     rover_id = args.rover_id
     server_host = args.server
     server_port = args.port
+    exit_on_complete = args.exit_on_complete
 
     connect_addr = (server_host, server_port)
-    logger.info(f"Starting ML client {rover_id} -> server {connect_addr}")
+    logger.info(f"Starting ML client {rover_id} -> server {connect_addr} (exit_on_complete={exit_on_complete})")
 
-    transport, protocol = await loop.create_datagram_endpoint(lambda: MLClientProtocol(rover_id), remote_addr=None)
+    # create an Event the protocol will set when the mission completes (if requested)
+    done_event: Optional[asyncio.Event] = asyncio.Event() if exit_on_complete else None
+
+    # create protocol and endpoint; pass exit_on_complete and done_event to the protocol factory
+    # Force IPv4 family and bind to loopback so the client receives replies from server reliably on Windows
+    transport, protocol = await loop.create_datagram_endpoint(
+        lambda: MLClientProtocol(rover_id, exit_on_complete=exit_on_complete, done_event=done_event),
+        local_addr=('127.0.0.1', 0),
+        family=socket.AF_INET,
+    )
     proto: MLClientProtocol = protocol
 
+    # request mission
     await proto.request_mission(connect_addr)
 
+    # If exit_on_complete is requested, wait for done_event then exit; else run forever like before
     try:
-        while True:
-            await asyncio.sleep(1)
+        if exit_on_complete and done_event:
+            # Wait until the protocol signals mission completion (or error)
+            await done_event.wait()
+            logger.info("Done event received; shutting down client (exit_on_complete)")
+            # small grace to let pending ACK handling finish
+            await asyncio.sleep(0.1)
+        else:
+            while True:
+                await asyncio.sleep(1)
     except KeyboardInterrupt:
         logger.info("Client shutting down")
     finally:
@@ -395,6 +450,7 @@ if __name__ == "__main__":
     parser.add_argument("--rover-id", required=True, help="Rover identifier (e.g. R-001)")
     parser.add_argument("--server", default="127.0.0.1", help="Nave-Mãe IP/hostname")
     parser.add_argument("--port", type=int, default=config.ML_UDP_PORT, help="Nave-Mãe ML UDP port")
+    parser.add_argument("--exit-on-complete", action="store_true", help="Exit automatically when assigned mission completes (useful for tests)")
     args = parser.parse_args()
     try:
         asyncio.run(main(args))

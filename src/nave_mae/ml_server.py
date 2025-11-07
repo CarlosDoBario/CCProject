@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 ml_server.py
 Implementação MissionLink (ML) UDP server (Nave-Mãe)
@@ -252,13 +253,16 @@ class MLServerProtocol(asyncio.DatagramProtocol):
             logger.exception("Failed to assign mission in mission_store")
 
         # Build MISSION_ASSIGN envelope using mission contents
+        # Ensure update_interval_s is a valid value (not None)
+        ui = pending.get("update_interval_s") or config.DEFAULT_UPDATE_INTERVAL_S
+
         assign_body = {
             "mission_id": pending["mission_id"],
             "area": pending.get("area"),
             "task": pending.get("task"),
             "params": pending.get("params", {}),
             "max_duration_s": pending.get("max_duration_s"),
-            "update_interval_s": pending.get("update_interval_s", config.DEFAULT_UPDATE_INTERVAL_S),
+            "update_interval_s": ui,
             "priority": pending.get("priority", 1),
         }
         assign_env = ml_schema.build_envelope(
@@ -288,7 +292,7 @@ class MLServerProtocol(asyncio.DatagramProtocol):
         body = envelope["body"]
         rover_id = header.get("rover_id") or str(addr)
         mission_id = header.get("mission_id") or body.get("mission_id")
-        logger.info(f"MISSION_COMPLETE from {rover_id} for mission {mission_id} result={body.get('result')}")
+        logger.info(f"MISSION_COMPLETE from {rover_id} for mission {mission_id}: {body.get('result')}")
         try:
             if mission_id:
                 self.mission_store.complete_mission(mission_id, rover_id, body)
