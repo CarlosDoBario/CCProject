@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 mission_store.py
 Missões em memória e armazenamento dos rovers usados pelo ML server (Nave-Mãe).
@@ -17,7 +18,7 @@ import json
 import os
 from threading import Lock
 
-from common import utils
+from common import utils, mission_schema
 
 logger = utils.get_logger("ml.mission_store")
 
@@ -132,7 +133,16 @@ class MissionStore:
         Cria missão a partir de mission_spec (espera campos como task, area, params, priority, etc.)
         Gera mission_id se não for fornecido.
         Normaliza a área para incluir z1,z2.
+
+        Agora integra validação usando common.mission_schema.validate_mission_spec().
+        Rejeita missões inválidas com ValueError contendo a lista de erros.
         """
+        # Validate mission_spec before creating
+        ok, errors = mission_schema.validate_mission_spec(mission_spec)
+        if not ok:
+            # Provide a clear error message for callers/tests
+            raise ValueError(f"Invalid mission_spec: {errors}")
+
         with self._lock:
             if mission_spec.get("mission_id"):
                 mid = mission_spec["mission_id"]
