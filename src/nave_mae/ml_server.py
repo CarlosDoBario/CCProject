@@ -3,8 +3,12 @@
 ml_server.py
 Implementação MissionLink (ML) UDP server (Nave-Mãe)
 
-Atualizado: PendingOutgoing guarda message_type/mission_id; adicionada lógica para envio de
-MISSION_CANCEL e processamento de ACKs de cancelamento para marcar missão como CANCELLED.
+Alterações principais:
+- run_server agora aceita persist_file (passa para MissionStore) e usa a env var ML_MISSION_STORE_FILE
+  ou um ficheiro padrão data/mission_store.json se não for explicitado.
+- Cria explicitamente um novo event loop com asyncio.new_event_loop() e regista com asyncio.set_event_loop(loop)
+  para compatibilidade com Python 3.10+.
+- Adicionados argumentos CLI (--persist-file, --host, --port).
 """
 
 import asyncio
@@ -12,6 +16,8 @@ import time
 import contextlib
 from typing import Dict, Any, Optional, Tuple
 import traceback
+import os
+import argparse
 
 from common import ml_schema, config, utils
 
@@ -27,7 +33,7 @@ except Exception:
         """
         Minimal fallback mission store for development.
         """
-        def __init__(self):
+        def __init__(self, persist_file: Optional[str] = None):
             self.missions: Dict[str, Dict[str, Any]] = {}
             self.rovers: Dict[str, Dict[str, Any]] = {}
             self._next_mission = 1
@@ -494,27 +500,76 @@ class MLServerProtocol(asyncio.DatagramProtocol):
 # -------------------------
 # Entrypoint
 # -------------------------
-def run_server(listen_host: str = "0.0.0.0", listen_port: int = None):
+def run_server(listen_host: str = "0.0.0.0", listen_port: int = None, persist_file: Optional[str] = None):
+    """
+    Start the ML UDP server.
+    - If persist_file is provided, pass it to MissionStore; else read ML_MISSION_STORE_FILE env var.
+    - If still None, no persistence is used.
+    """
+    # Determine persist_file: argument > env var > default data/mission_store.json (if data/ exists)
+    pf = persist_file or os.getenv("ML_MISSION_STORE_FILE")
+    if pf is None:
+        # default to data/mission_store.json in repo root if directory exists or can be created
+        default_dir = os.path.join(os.getcwd(), "data")
+        try:
+            os.makedirs(default_dir, exist_ok=True)
+            pf = os.path.join(default_dir, "mission_store.json")
+        except Exception:
+            pf = None
+
     if listen_port is None:
         listen_port = config.ML_UDP_PORT
-    loop = asyncio.get_event_loop()
-    mission_store = MissionStore()
+
+    # Create a fresh event loop for this thread and set it as the current loop.
+    # In modern Python get_event_loop() does not create a loop automatically.
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
+    # Pass persist_file to MissionStore so it persists if configured
+    mission_store = MissionStore(persist_file=pf) if pf else MissionStore()
     proto = MLServerProtocol(mission_store)
-    listen = loop.create_datagram_endpoint(lambda: proto, local_addr=(listen_host, listen_port))
-    transport, _ = loop.run_until_complete(listen)
+
     try:
+        listen = loop.create_datagram_endpoint(lambda: proto, local_addr=(listen_host, listen_port))
+        transport, _ = loop.run_until_complete(listen)
+        logger.info(f"Server starting (persist_file={pf})")
         loop.run_forever()
     except KeyboardInterrupt:
         logger.info("Shutting down ML server (KeyboardInterrupt)")
     finally:
-        transport.close()
+        # tidy up transport and tasks
+        try:
+            transport.close()
+        except Exception:
+            pass
         if proto._task_retransmit:
             proto._task_retransmit.cancel()
         if proto._task_cleanup:
             proto._task_cleanup.cancel()
-        loop.run_until_complete(asyncio.sleep(0.1))
+        # give loop a moment to cancel tasks
+        try:
+            loop.run_until_complete(asyncio.sleep(0.1))
+        except Exception:
+            pass
         loop.close()
 
 
 if __name__ == "__main__":
-    run_server()
+    parser = argparse.ArgumentParser(description="MissionLink ML server (Nave-Mãe)")
+    parser.add_argument("--host", default="0.0.0.0", help="Host/interface to bind")
+    parser.add_argument("--port", type=int, default=None, help="UDP port to bind (overrides ML_UDP_PORT)")
+    parser.add_argument("--persist-file", default=None, help="Path to mission_store persist file (overrides ML_MISSION_STORE_FILE)")
+    args = parser.parse_args()
+
+    # If user passed --persist-file as a directory ensure directory exists
+    if args.persist_file:
+        try:
+            d = os.path.dirname(args.persist_file) or "."
+            os.makedirs(d, exist_ok=True)
+        except Exception:
+            logger.exception("Failed to create directory for persist-file")
+
+    try:
+        run_server(listen_host=args.host, listen_port=args.port, persist_file=args.persist_file)
+    except Exception:
+        traceback.print_exc()

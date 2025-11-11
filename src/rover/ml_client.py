@@ -4,13 +4,16 @@ ml_client.py
 MissionLink (ML) UDP client (Rover) implementation integrated with RoverSim.
 
 Atualizado: quando retransmits esgotam para PROGRESS/MISSION_COMPLETE, marcamos missão AT_RISK
-e persistimos o pacote não entregue para possível recuperação.
+e persistimos o pacote não entregue para possível recuperação. Adicionado:
+- re-send automático dos pacotes persistidos ao enviar REQUEST_MISSION
+- remoção do ficheiro persistido após recepção do ACK correspondente
 """
 
 import asyncio
 import time
 import socket
 import os
+import glob
 from typing import Dict, Any, Optional, Tuple
 import traceback
 
@@ -183,7 +186,14 @@ class MLClientProtocol(asyncio.DatagramProtocol):
     async def request_mission(self, server_addr: Tuple[str, int]):
         """
         Envia REQUEST_MISSION; does not expect ACK but server will reply with ASSIGN/ERROR.
+        Also attempts to resend any persisted undelivered packets for this rover to server_addr.
         """
+        # Attempt to resend persisted packets before requesting a new mission
+        try:
+            self._resend_persisted_packets(server_addr)
+        except Exception:
+            logger.exception("Error while resending persisted packets (continuing to request mission)")
+
         body = {
             "capabilities": ["sampling", "imaging", "env"],
             "battery_level_pct": 100,
@@ -192,6 +202,57 @@ class MLClientProtocol(asyncio.DatagramProtocol):
         }
         env = ml_schema.build_envelope("REQUEST_MISSION", body=body, rover_id=self.rover_id)
         self._enqueue_and_send(env, server_addr, expect_ack=False)
+
+    def _resend_persisted_packets(self, server_addr: Tuple[str, int]) -> None:
+        """
+        Scan ML_CLIENT_CACHE_DIR (or default) for files matching {rover_id}-{msg_id}.bin
+        and attempt to resend them to server_addr. Files are NOT deleted here; they are
+        removed only when an ACK for the corresponding msg_id is received.
+        """
+        cache_dir = os.getenv("ML_CLIENT_CACHE_DIR", None) or os.path.join(os.path.expanduser("~"), ".ml_client_cache")
+        if not os.path.isdir(cache_dir):
+            # nothing to do
+            return
+
+        pattern = os.path.join(cache_dir, f"{self.rover_id}-*.bin")
+        files = glob.glob(pattern)
+        if not files:
+            return
+
+        logger.info(f"Found {len(files)} persisted packet(s) for rover {self.rover_id}, attempting resend to {server_addr}")
+        for fpath in files:
+            try:
+                with open(fpath, "rb") as f:
+                    packet = f.read()
+                # Try to parse envelope to extract header info (msg_id, message_type)
+                try:
+                    env = ml_schema.parse_envelope(packet)
+                    header = env["header"]
+                    msg_id = header["msg_id"]
+                    msg_type = header.get("message_type", "UNKNOWN")
+                except Exception:
+                    # If parsing fails, fallback to using filename to get msg_id
+                    basename = os.path.basename(fpath)
+                    # expecting format roverid-msgid.bin
+                    parts = basename.rsplit("-", 1)
+                    msg_id = parts[1].rsplit(".", 1)[0] if len(parts) == 2 else fpath
+                    msg_type = "UNKNOWN"
+
+                now = time.time()
+                timeout = config.TIMEOUT_TX_INITIAL
+                po = PendingSend(msg_id=msg_id, packet=packet, addr=server_addr, created_at=now, timeout_s=timeout, message_type=msg_type)
+                po.attempts = 1
+                po.next_timeout = now + timeout
+                # register pending so retransmit loop can handle retries and ack removal will clean up file
+                self.pending[msg_id] = po
+                # send now
+                try:
+                    self.transport.sendto(packet, server_addr)
+                    logger.info(f"Resent persisted packet {msg_id} to {server_addr}")
+                except Exception:
+                    logger.exception(f"Failed to resend persisted packet {msg_id} to {server_addr}")
+            except Exception:
+                logger.exception(f"Error while processing persisted file {fpath}")
 
     async def _handle_assign(self, envelope: Dict[str, Any], addr: Tuple[str, int]):
         header = envelope["header"]
@@ -315,6 +376,18 @@ class MLClientProtocol(asyncio.DatagramProtocol):
             elapsed = time.time() - po.created_at
             logger.info(f"Received ACK for {acked_msg_id} (attempts={po.attempts} elapsed={elapsed:.2f}s)")
             self.metrics.incr("acks_received")
+            # If there was a persisted copy for this msg_id, remove it now
+            try:
+                cache_dir = os.getenv("ML_CLIENT_CACHE_DIR", None) or os.path.join(os.path.expanduser("~"), ".ml_client_cache")
+                fname = os.path.join(cache_dir, f"{self.rover_id}-{acked_msg_id}.bin")
+                if os.path.exists(fname):
+                    try:
+                        os.remove(fname)
+                        logger.info(f"Removed persisted packet file {fname} after ACK {acked_msg_id}")
+                    except Exception:
+                        logger.exception(f"Failed to remove persisted packet file {fname}")
+            except Exception:
+                logger.exception("Error while trying to remove persisted packet after ACK")
         else:
             logger.debug(f"ACK for unknown msg {acked_msg_id}")
 

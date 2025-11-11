@@ -1,0 +1,887 @@
+{
+  "missions": {
+    "M-0001": {
+      "mission_id": "M-0001",
+      "task": "capture_images",
+      "area": {
+        "x1": 10.0,
+        "y1": 10.0,
+        "z1": 0.0,
+        "x2": 20.0,
+        "y2": 20.0,
+        "z2": 0.0
+      },
+      "params": {
+        "interval_s": 5,
+        "frames": 60
+      },
+      "priority": 1,
+      "max_duration_s": null,
+      "update_interval_s": null,
+      "created_at": "2025-11-11T09:47:12+00:00",
+      "state": "CREATED",
+      "assigned_rover": null,
+      "assigned_at": null,
+      "history": [
+        {
+          "ts": "2025-11-11T10:12:07+00:00",
+          "type": "PROGRESS",
+          "rover": "R-TEST",
+          "payload": {
+            "mission_id": "M-0001",
+            "progress_pct": 12
+          }
+        },
+        {
+          "ts": "2025-11-11T10:21:12+00:00",
+          "type": "RECOVERED",
+          "prev_rover": null
+        }
+      ],
+      "last_progress_pct": 12
+    },
+    "M-0002": {
+      "mission_id": "M-0002",
+      "task": "collect_samples",
+      "area": {
+        "x1": 30.0,
+        "y1": 5.0,
+        "z1": 0.0,
+        "x2": 35.0,
+        "y2": 10.0,
+        "z2": 0.0
+      },
+      "params": {
+        "depth_mm": 50,
+        "sample_count": 2
+      },
+      "priority": 2,
+      "max_duration_s": null,
+      "update_interval_s": null,
+      "created_at": "2025-11-11T09:47:12+00:00",
+      "state": "COMPLETED",
+      "assigned_rover": "R-TEST",
+      "assigned_at": "2025-11-11T10:22:42+00:00",
+      "history": [
+        {
+          "ts": "2025-11-11T10:22:42+00:00",
+          "type": "ASSIGNED",
+          "rover": "R-TEST"
+        },
+        {
+          "ts": "2025-11-11T10:22:42+00:00",
+          "type": "PROGRESS",
+          "rover": "R-TEST",
+          "payload": {
+            "battery_level_pct": 40.0,
+            "errors": [],
+            "mission_id": "M-0002",
+            "position": {
+              "x": -7.5350664098236795,
+              "y": 10.040463355909205,
+              "z": 0.0
+            },
+            "progress_pct": 100.0,
+            "samples_collected": 2,
+            "status": "completed"
+          }
+        },
+        {
+          "ts": "2025-11-11T10:22:42+00:00",
+          "type": "COMPLETE",
+          "rover": "R-TEST",
+          "payload": {
+            "info": "simulated completion",
+            "mission_id": "M-0002",
+            "result": "success",
+            "samples_collected": 2
+          }
+        }
+      ],
+      "last_progress_pct": 100.0,
+      "completed_at": "2025-11-11T10:22:42+00:00"
+    },
+    "M-0003": {
+      "mission_id": "M-0003",
+      "task": "env_analysis",
+      "area": {
+        "x1": 0.0,
+        "y1": 0.0,
+        "z1": 0.0,
+        "x2": 50.0,
+        "y2": 50.0,
+        "z2": 5.0
+      },
+      "params": {
+        "sensors": [
+          "temp",
+          "pressure"
+        ],
+        "sampling_rate_s": 10
+      },
+      "priority": 3,
+      "max_duration_s": null,
+      "update_interval_s": null,
+      "created_at": "2025-11-11T09:47:12+00:00",
+      "state": "COMPLETED",
+      "assigned_rover": "R-E2E",
+      "assigned_at": "2025-11-11T09:47:13+00:00",
+      "history": [
+        {
+          "ts": "2025-11-11T09:47:13+00:00",
+          "type": "ASSIGNED",
+          "rover": "R-E2E"
+        },
+        {
+          "ts": "2025-11-11T09:47:13+00:00",
+          "type": "PROGRESS",
+          "rover": "R-E2E",
+          "payload": {
+            "battery_level_pct": 96.0,
+            "errors": [],
+            "mission_id": "M-0003",
+            "position": {
+              "x": 0.8147026578618346,
+              "y": 0.8097205607048086,
+              "z": 0.0
+            },
+            "progress_pct": 100.0,
+            "samples_collected": 5,
+            "status": "completed"
+          }
+        },
+        {
+          "ts": "2025-11-11T09:47:13+00:00",
+          "type": "COMPLETE",
+          "rover": "R-E2E",
+          "payload": {
+            "info": "simulated completion",
+            "mission_id": "M-0003",
+            "result": "success",
+            "samples_collected": 5
+          }
+        }
+      ],
+      "last_progress_pct": 100.0,
+      "completed_at": "2025-11-11T09:47:13+00:00"
+    },
+    "M-0004": {
+      "mission_id": "M-0004",
+      "task": "collect_samples",
+      "area": null,
+      "params": {
+        "sample_count": 1,
+        "depth_mm": 10
+      },
+      "priority": 1,
+      "max_duration_s": null,
+      "update_interval_s": null,
+      "created_at": "2025-11-11T09:47:13+00:00",
+      "state": "CANCELLED",
+      "assigned_rover": "R-CANCEL",
+      "assigned_at": "2025-11-11T09:47:13+00:00",
+      "history": [
+        {
+          "ts": "2025-11-11T09:47:13+00:00",
+          "type": "ASSIGNED",
+          "rover": "R-CANCEL"
+        },
+        {
+          "ts": "2025-11-11T09:47:13+00:00",
+          "type": "CANCEL",
+          "reason": "cancel_ack_received"
+        }
+      ],
+      "cancelled_at": "2025-11-11T09:47:13+00:00"
+    },
+    "M-0005": {
+      "mission_id": "M-0005",
+      "task": "collect_samples",
+      "area": {
+        "x1": 0.0,
+        "y1": 0.0,
+        "z1": 0.0,
+        "x2": 10.0,
+        "y2": 10.0,
+        "z2": 0.0
+      },
+      "params": {
+        "sample_count": 2,
+        "depth_mm": 50
+      },
+      "priority": 1,
+      "max_duration_s": null,
+      "update_interval_s": null,
+      "created_at": "2025-11-11T09:47:14+00:00",
+      "state": "CREATED",
+      "assigned_rover": null,
+      "assigned_at": null,
+      "history": []
+    },
+    "M-0006": {
+      "mission_id": "M-0006",
+      "task": "capture_images",
+      "area": {
+        "x1": 10.0,
+        "y1": 10.0,
+        "z1": 0.0,
+        "x2": 20.0,
+        "y2": 20.0,
+        "z2": 0.0
+      },
+      "params": {
+        "interval_s": 5,
+        "frames": 60
+      },
+      "priority": 1,
+      "max_duration_s": null,
+      "update_interval_s": null,
+      "created_at": "2025-11-11T09:47:14+00:00",
+      "state": "CREATED",
+      "assigned_rover": null,
+      "assigned_at": null,
+      "history": []
+    },
+    "M-0007": {
+      "mission_id": "M-0007",
+      "task": "collect_samples",
+      "area": {
+        "x1": 30.0,
+        "y1": 5.0,
+        "z1": 0.0,
+        "x2": 35.0,
+        "y2": 10.0,
+        "z2": 0.0
+      },
+      "params": {
+        "depth_mm": 50,
+        "sample_count": 2
+      },
+      "priority": 2,
+      "max_duration_s": null,
+      "update_interval_s": null,
+      "created_at": "2025-11-11T09:47:14+00:00",
+      "state": "CREATED",
+      "assigned_rover": null,
+      "assigned_at": null,
+      "history": []
+    },
+    "M-0008": {
+      "mission_id": "M-0008",
+      "task": "env_analysis",
+      "area": {
+        "x1": 0.0,
+        "y1": 0.0,
+        "z1": 0.0,
+        "x2": 50.0,
+        "y2": 50.0,
+        "z2": 5.0
+      },
+      "params": {
+        "sensors": [
+          "temp",
+          "pressure"
+        ],
+        "sampling_rate_s": 10
+      },
+      "priority": 3,
+      "max_duration_s": null,
+      "update_interval_s": null,
+      "created_at": "2025-11-11T09:47:14+00:00",
+      "state": "COMPLETED",
+      "assigned_rover": "R-E2E",
+      "assigned_at": "2025-11-11T09:47:43+00:00",
+      "history": [
+        {
+          "ts": "2025-11-11T09:47:43+00:00",
+          "type": "ASSIGNED",
+          "rover": "R-E2E"
+        },
+        {
+          "ts": "2025-11-11T09:47:43+00:00",
+          "type": "PROGRESS",
+          "rover": "R-E2E",
+          "payload": {
+            "battery_level_pct": 96.0,
+            "errors": [],
+            "mission_id": "M-0008",
+            "position": {
+              "x": -0.7454071304663774,
+              "y": -0.17501244019489848,
+              "z": 0.0
+            },
+            "progress_pct": 100.0,
+            "samples_collected": 5,
+            "status": "completed"
+          }
+        },
+        {
+          "ts": "2025-11-11T09:47:43+00:00",
+          "type": "COMPLETE",
+          "rover": "R-E2E",
+          "payload": {
+            "info": "simulated completion",
+            "mission_id": "M-0008",
+            "result": "success",
+            "samples_collected": 5
+          }
+        }
+      ],
+      "last_progress_pct": 100.0,
+      "completed_at": "2025-11-11T09:47:43+00:00"
+    },
+    "M-0009": {
+      "mission_id": "M-0009",
+      "task": "collect_samples",
+      "area": null,
+      "params": {
+        "sample_count": 1,
+        "depth_mm": 10
+      },
+      "priority": 1,
+      "max_duration_s": null,
+      "update_interval_s": null,
+      "created_at": "2025-11-11T09:47:14+00:00",
+      "state": "CREATED",
+      "assigned_rover": null,
+      "assigned_at": "2025-11-11T09:47:14+00:00",
+      "history": [
+        {
+          "ts": "2025-11-11T09:47:14+00:00",
+          "type": "ASSIGNED",
+          "rover": "R-EXH"
+        },
+        {
+          "ts": "2025-11-11T09:47:14+00:00",
+          "type": "ASSIGN_FAILED",
+          "reason": "undeliverable_assign"
+        }
+      ]
+    },
+    "M-0010": {
+      "mission_id": "M-0010",
+      "task": "capture_images",
+      "area": {
+        "x1": 10.0,
+        "y1": 10.0,
+        "z1": 0.0,
+        "x2": 20.0,
+        "y2": 20.0,
+        "z2": 0.0
+      },
+      "params": {
+        "interval_s": 5,
+        "frames": 60
+      },
+      "priority": 1,
+      "max_duration_s": null,
+      "update_interval_s": null,
+      "created_at": "2025-11-11T09:47:42+00:00",
+      "state": "CREATED",
+      "assigned_rover": null,
+      "assigned_at": null,
+      "history": []
+    },
+    "M-0011": {
+      "mission_id": "M-0011",
+      "task": "collect_samples",
+      "area": {
+        "x1": 30.0,
+        "y1": 5.0,
+        "z1": 0.0,
+        "x2": 35.0,
+        "y2": 10.0,
+        "z2": 0.0
+      },
+      "params": {
+        "depth_mm": 50,
+        "sample_count": 2
+      },
+      "priority": 2,
+      "max_duration_s": null,
+      "update_interval_s": null,
+      "created_at": "2025-11-11T09:47:42+00:00",
+      "state": "CREATED",
+      "assigned_rover": null,
+      "assigned_at": null,
+      "history": []
+    },
+    "M-0012": {
+      "mission_id": "M-0012",
+      "task": "env_analysis",
+      "area": {
+        "x1": 0.0,
+        "y1": 0.0,
+        "z1": 0.0,
+        "x2": 50.0,
+        "y2": 50.0,
+        "z2": 5.0
+      },
+      "params": {
+        "sensors": [
+          "temp",
+          "pressure"
+        ],
+        "sampling_rate_s": 10
+      },
+      "priority": 3,
+      "max_duration_s": null,
+      "update_interval_s": null,
+      "created_at": "2025-11-11T09:47:42+00:00",
+      "state": "COMPLETED",
+      "assigned_rover": "R-E2E",
+      "assigned_at": "2025-11-11T09:48:42+00:00",
+      "history": [
+        {
+          "ts": "2025-11-11T09:48:42+00:00",
+          "type": "ASSIGNED",
+          "rover": "R-E2E"
+        },
+        {
+          "ts": "2025-11-11T09:48:42+00:00",
+          "type": "PROGRESS",
+          "rover": "R-E2E",
+          "payload": {
+            "battery_level_pct": 96.0,
+            "errors": [],
+            "mission_id": "M-0012",
+            "position": {
+              "x": 0.6231438606594504,
+              "y": 0.8223271000432713,
+              "z": 0.0
+            },
+            "progress_pct": 100.0,
+            "samples_collected": 5,
+            "status": "completed"
+          }
+        },
+        {
+          "ts": "2025-11-11T09:48:42+00:00",
+          "type": "COMPLETE",
+          "rover": "R-E2E",
+          "payload": {
+            "info": "simulated completion",
+            "mission_id": "M-0012",
+            "result": "success",
+            "samples_collected": 5
+          }
+        }
+      ],
+      "last_progress_pct": 100.0,
+      "completed_at": "2025-11-11T09:48:42+00:00"
+    },
+    "M-0013": {
+      "mission_id": "M-0013",
+      "task": "capture_images",
+      "area": {
+        "x1": 10.0,
+        "y1": 10.0,
+        "z1": 0.0,
+        "x2": 20.0,
+        "y2": 20.0,
+        "z2": 0.0
+      },
+      "params": {
+        "interval_s": 5,
+        "frames": 60
+      },
+      "priority": 1,
+      "max_duration_s": null,
+      "update_interval_s": null,
+      "created_at": "2025-11-11T09:48:42+00:00",
+      "state": "CREATED",
+      "assigned_rover": null,
+      "assigned_at": null,
+      "history": []
+    },
+    "M-0014": {
+      "mission_id": "M-0014",
+      "task": "collect_samples",
+      "area": {
+        "x1": 30.0,
+        "y1": 5.0,
+        "z1": 0.0,
+        "x2": 35.0,
+        "y2": 10.0,
+        "z2": 0.0
+      },
+      "params": {
+        "depth_mm": 50,
+        "sample_count": 2
+      },
+      "priority": 2,
+      "max_duration_s": null,
+      "update_interval_s": null,
+      "created_at": "2025-11-11T09:48:42+00:00",
+      "state": "CREATED",
+      "assigned_rover": null,
+      "assigned_at": null,
+      "history": []
+    },
+    "M-0015": {
+      "mission_id": "M-0015",
+      "task": "env_analysis",
+      "area": {
+        "x1": 0.0,
+        "y1": 0.0,
+        "z1": 0.0,
+        "x2": 50.0,
+        "y2": 50.0,
+        "z2": 5.0
+      },
+      "params": {
+        "sensors": [
+          "temp",
+          "pressure"
+        ],
+        "sampling_rate_s": 10
+      },
+      "priority": 3,
+      "max_duration_s": null,
+      "update_interval_s": null,
+      "created_at": "2025-11-11T09:48:42+00:00",
+      "state": "COMPLETED",
+      "assigned_rover": "R-TEST",
+      "assigned_at": "2025-11-11T10:12:07+00:00",
+      "history": [
+        {
+          "ts": "2025-11-11T10:12:07+00:00",
+          "type": "ASSIGNED",
+          "rover": "R-TEST"
+        },
+        {
+          "ts": "2025-11-11T10:12:07+00:00",
+          "type": "PROGRESS",
+          "rover": "R-TEST",
+          "payload": {
+            "battery_level_pct": 96.0,
+            "errors": [],
+            "mission_id": "M-0015",
+            "position": {
+              "x": -0.6711317900204685,
+              "y": -0.10138965791510701,
+              "z": 0.0
+            },
+            "progress_pct": 100.0,
+            "samples_collected": 5,
+            "status": "completed"
+          }
+        },
+        {
+          "ts": "2025-11-11T10:12:07+00:00",
+          "type": "COMPLETE",
+          "rover": "R-TEST",
+          "payload": {
+            "info": "simulated completion",
+            "mission_id": "M-0015",
+            "result": "success",
+            "samples_collected": 5
+          }
+        }
+      ],
+      "last_progress_pct": 100.0,
+      "completed_at": "2025-11-11T10:12:07+00:00"
+    },
+    "M-0016": {
+      "mission_id": "M-0016",
+      "task": "capture_images",
+      "area": {
+        "x1": 10.0,
+        "y1": 10.0,
+        "z1": 0.0,
+        "x2": 20.0,
+        "y2": 20.0,
+        "z2": 0.0
+      },
+      "params": {
+        "interval_s": 5,
+        "frames": 60
+      },
+      "priority": 1,
+      "max_duration_s": null,
+      "update_interval_s": null,
+      "created_at": "2025-11-11T10:28:18+00:00",
+      "state": "CREATED",
+      "assigned_rover": null,
+      "assigned_at": null,
+      "history": []
+    },
+    "M-0017": {
+      "mission_id": "M-0017",
+      "task": "collect_samples",
+      "area": {
+        "x1": 30.0,
+        "y1": 5.0,
+        "z1": 0.0,
+        "x2": 35.0,
+        "y2": 10.0,
+        "z2": 0.0
+      },
+      "params": {
+        "depth_mm": 50,
+        "sample_count": 2
+      },
+      "priority": 2,
+      "max_duration_s": null,
+      "update_interval_s": null,
+      "created_at": "2025-11-11T10:28:18+00:00",
+      "state": "CREATED",
+      "assigned_rover": null,
+      "assigned_at": null,
+      "history": []
+    },
+    "M-0018": {
+      "mission_id": "M-0018",
+      "task": "env_analysis",
+      "area": {
+        "x1": 0.0,
+        "y1": 0.0,
+        "z1": 0.0,
+        "x2": 50.0,
+        "y2": 50.0,
+        "z2": 5.0
+      },
+      "params": {
+        "sensors": [
+          "temp",
+          "pressure"
+        ],
+        "sampling_rate_s": 10
+      },
+      "priority": 3,
+      "max_duration_s": null,
+      "update_interval_s": null,
+      "created_at": "2025-11-11T10:28:18+00:00",
+      "state": "COMPLETED",
+      "assigned_rover": "R-E2E",
+      "assigned_at": "2025-11-11T10:28:18+00:00",
+      "history": [
+        {
+          "ts": "2025-11-11T10:28:18+00:00",
+          "type": "ASSIGNED",
+          "rover": "R-E2E"
+        },
+        {
+          "ts": "2025-11-11T10:28:18+00:00",
+          "type": "PROGRESS",
+          "rover": "R-E2E",
+          "payload": {
+            "battery_level_pct": 96.0,
+            "errors": [],
+            "mission_id": "M-0018",
+            "position": {
+              "x": -0.025509760909109724,
+              "y": -0.894555147218276,
+              "z": 0.0
+            },
+            "progress_pct": 100.0,
+            "samples_collected": 5,
+            "status": "completed"
+          }
+        },
+        {
+          "ts": "2025-11-11T10:28:18+00:00",
+          "type": "COMPLETE",
+          "rover": "R-E2E",
+          "payload": {
+            "info": "simulated completion",
+            "mission_id": "M-0018",
+            "result": "success",
+            "samples_collected": 5
+          }
+        }
+      ],
+      "last_progress_pct": 100.0,
+      "completed_at": "2025-11-11T10:28:18+00:00"
+    },
+    "M-0019": {
+      "mission_id": "M-0019",
+      "task": "collect_samples",
+      "area": null,
+      "params": {
+        "sample_count": 1,
+        "depth_mm": 10
+      },
+      "priority": 1,
+      "max_duration_s": null,
+      "update_interval_s": null,
+      "created_at": "2025-11-11T10:28:19+00:00",
+      "state": "CANCELLED",
+      "assigned_rover": "R-CANCEL",
+      "assigned_at": "2025-11-11T10:28:19+00:00",
+      "history": [
+        {
+          "ts": "2025-11-11T10:28:19+00:00",
+          "type": "ASSIGNED",
+          "rover": "R-CANCEL"
+        },
+        {
+          "ts": "2025-11-11T10:28:19+00:00",
+          "type": "CANCEL",
+          "reason": "cancel_ack_received"
+        }
+      ],
+      "cancelled_at": "2025-11-11T10:28:19+00:00"
+    },
+    "M-0020": {
+      "mission_id": "M-0020",
+      "task": "collect_samples",
+      "area": {
+        "x1": 0.0,
+        "y1": 0.0,
+        "z1": 0.0,
+        "x2": 10.0,
+        "y2": 10.0,
+        "z2": 0.0
+      },
+      "params": {
+        "sample_count": 2,
+        "depth_mm": 50
+      },
+      "priority": 1,
+      "max_duration_s": null,
+      "update_interval_s": null,
+      "created_at": "2025-11-11T10:28:19+00:00",
+      "state": "CREATED",
+      "assigned_rover": null,
+      "assigned_at": null,
+      "history": []
+    },
+    "M-0021": {
+      "mission_id": "M-0021",
+      "task": "capture_images",
+      "area": {
+        "x1": 10.0,
+        "y1": 10.0,
+        "z1": 0.0,
+        "x2": 20.0,
+        "y2": 20.0,
+        "z2": 0.0
+      },
+      "params": {
+        "interval_s": 5,
+        "frames": 60
+      },
+      "priority": 1,
+      "max_duration_s": null,
+      "update_interval_s": null,
+      "created_at": "2025-11-11T10:28:19+00:00",
+      "state": "CREATED",
+      "assigned_rover": null,
+      "assigned_at": null,
+      "history": []
+    },
+    "M-0022": {
+      "mission_id": "M-0022",
+      "task": "collect_samples",
+      "area": {
+        "x1": 30.0,
+        "y1": 5.0,
+        "z1": 0.0,
+        "x2": 35.0,
+        "y2": 10.0,
+        "z2": 0.0
+      },
+      "params": {
+        "depth_mm": 50,
+        "sample_count": 2
+      },
+      "priority": 2,
+      "max_duration_s": null,
+      "update_interval_s": null,
+      "created_at": "2025-11-11T10:28:19+00:00",
+      "state": "CREATED",
+      "assigned_rover": null,
+      "assigned_at": null,
+      "history": []
+    },
+    "M-0023": {
+      "mission_id": "M-0023",
+      "task": "env_analysis",
+      "area": {
+        "x1": 0.0,
+        "y1": 0.0,
+        "z1": 0.0,
+        "x2": 50.0,
+        "y2": 50.0,
+        "z2": 5.0
+      },
+      "params": {
+        "sensors": [
+          "temp",
+          "pressure"
+        ],
+        "sampling_rate_s": 10
+      },
+      "priority": 3,
+      "max_duration_s": null,
+      "update_interval_s": null,
+      "created_at": "2025-11-11T10:28:19+00:00",
+      "state": "CREATED",
+      "assigned_rover": null,
+      "assigned_at": null,
+      "history": []
+    },
+    "M-0024": {
+      "mission_id": "M-0024",
+      "task": "collect_samples",
+      "area": null,
+      "params": {
+        "sample_count": 1,
+        "depth_mm": 10
+      },
+      "priority": 1,
+      "max_duration_s": null,
+      "update_interval_s": null,
+      "created_at": "2025-11-11T10:28:19+00:00",
+      "state": "CREATED",
+      "assigned_rover": null,
+      "assigned_at": "2025-11-11T10:28:19+00:00",
+      "history": [
+        {
+          "ts": "2025-11-11T10:28:19+00:00",
+          "type": "ASSIGNED",
+          "rover": "R-EXH"
+        },
+        {
+          "ts": "2025-11-11T10:28:19+00:00",
+          "type": "ASSIGN_FAILED",
+          "reason": "undeliverable_assign"
+        }
+      ]
+    }
+  },
+  "rovers": {
+    "R-E2E": {
+      "rover_id": "R-E2E",
+      "address": {
+        "ip": "127.0.0.1",
+        "port": 64070
+      },
+      "last_seen": "2025-11-11T10:28:18+00:00",
+      "state": "IDLE"
+    },
+    "R-CANCEL": {
+      "rover_id": "R-CANCEL",
+      "address": {
+        "ip": "127.0.0.1",
+        "port": 51000
+      },
+      "last_seen": "2025-11-11T10:28:19+00:00",
+      "state": "IDLE"
+    },
+    "R-EXH": {
+      "state": "IDLE"
+    },
+    "R-TEST": {
+      "rover_id": "R-TEST",
+      "address": {
+        "ip": "127.0.0.1",
+        "port": 60573
+      },
+      "last_seen": "2025-11-11T10:22:42+00:00",
+      "state": "IDLE"
+    }
+  },
+  "_next_mission_seq": 25
+}

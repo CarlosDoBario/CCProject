@@ -14,6 +14,7 @@ import time
 import logging
 import json
 import random
+import sys
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional, Iterator
 
@@ -23,18 +24,35 @@ from common import config
 def get_logger(name: str = "ml") -> logging.Logger:
     """
     Retorna um logger configurado com nível a partir de config.LOG_LEVEL.
-    Mensagens são formatadas em texto legível; podes trocar para JSON se preferires.
-    Chamar get_logger() em cada módulo para obter logger consistente.
+    Garante uma única StreamHandler bem formatada (remove handlers pré-existentes),
+    e envia a saída para stdout (reduz a probabilidade de mistura com stderr/prints).
     """
     logger = logging.getLogger(name)
-    if not logger.handlers:
-        level = getattr(logging, config.LOG_LEVEL.upper(), logging.INFO)
-        logger.setLevel(level)
-        handler = logging.StreamHandler()
-        fmt = "%(asctime)s %(levelname)s [%(name)s] %(message)s"
-        handler.setFormatter(logging.Formatter(fmt))
-        logger.addHandler(handler)
-        logger.propagate = False
+
+    # Normalize name: allow callers to call get_logger many vezes without duplicating handlers
+    # Remove existing handlers to avoid duplicate output if modules are reloaded.
+    if logger.handlers:
+        for h in list(logger.handlers):
+            try:
+                logger.removeHandler(h)
+            except Exception:
+                pass
+
+    level = getattr(logging, config.LOG_LEVEL.upper(), logging.INFO)
+    logger.setLevel(level)
+
+    # Create handler explicitly bound to stdout to keep all logs on same stream
+    handler = logging.StreamHandler(stream=sys.stdout)
+    fmt = "%(asctime)s %(levelname)s [%(name)s] %(message)s"
+    handler.setFormatter(logging.Formatter(fmt))
+    handler.setLevel(level)
+
+    logger.addHandler(handler)
+    logger.propagate = False
+
+    # Route warnings (from the warnings module) to logging
+    logging.captureWarnings(True)
+
     return logger
 
 
