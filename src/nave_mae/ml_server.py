@@ -9,6 +9,8 @@ Alterações principais:
 - Cria explicitamente um novo event loop com asyncio.new_event_loop() e regista com asyncio.set_event_loop(loop)
   para compatibilidade com Python 3.10+.
 - Adicionados argumentos CLI (--persist-file, --host, --port).
+- Adicionada opção --enable-telemetry para arrancar TelemetryServer/TelemetryStore no mesmo processo.
+- Ao executar como script, configuramos logging.basicConfig para que os logs do TelemetryServer apareçam no terminal.
 """
 
 import asyncio
@@ -18,6 +20,7 @@ from typing import Dict, Any, Optional, Tuple
 import traceback
 import os
 import argparse
+import logging
 
 from common import ml_schema, config, utils
 
@@ -500,11 +503,13 @@ class MLServerProtocol(asyncio.DatagramProtocol):
 # -------------------------
 # Entrypoint
 # -------------------------
-def run_server(listen_host: str = "0.0.0.0", listen_port: int = None, persist_file: Optional[str] = None):
+def run_server(listen_host: str = "0.0.0.0", listen_port: int = None, persist_file: Optional[str] = None, enable_telemetry: bool = False):
     """
     Start the ML UDP server.
     - If persist_file is provided, pass it to MissionStore; else read ML_MISSION_STORE_FILE env var.
     - If still None, no persistence is used.
+    - If enable_telemetry is True, start TelemetryServer/TelemetryStore via nave_mae.startup.start_services
+      so TelemetryServer can share the same MissionStore and be stopped cleanly on shutdown.
     """
     # Determine persist_file: argument > env var > default data/mission_store.json (if data/ exists)
     pf = persist_file or os.getenv("ML_MISSION_STORE_FILE")
@@ -521,13 +526,34 @@ def run_server(listen_host: str = "0.0.0.0", listen_port: int = None, persist_fi
         listen_port = config.ML_UDP_PORT
 
     # Create a fresh event loop for this thread and set it as the current loop.
-    # In modern Python get_event_loop() does not create a loop automatically.
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
-    # Pass persist_file to MissionStore so it persists if configured
-    mission_store = MissionStore(persist_file=pf) if pf else MissionStore()
-    proto = MLServerProtocol(mission_store)
+    telemetry_server = None
+    telemetry_ts = None
+
+    # If telemetry integration requested, start services (which will create ms/ts and telemetry_server)
+    if enable_telemetry:
+        try:
+            # lazy import
+            from nave_mae.startup import start_services
+            telemetry_host = getattr(config, "TELEMETRY_HOST", "127.0.0.1")
+            telemetry_port = getattr(config, "TELEMETRY_PORT", 65080)
+            services = loop.run_until_complete(
+                start_services(host=telemetry_host, telemetry_port=telemetry_port, start_ml_server=False, ml_host=listen_host, ml_port=listen_port, persist_file=pf,)
+            )
+            ms = services.get("ms")
+            telemetry_server = services.get("telemetry_server")
+            telemetry_ts = services.get("ts")
+            logger.info("Telemetry integration enabled; telemetry server started on %s:%s", telemetry_host, telemetry_port)
+        except Exception:
+            logger.exception("Failed to start telemetry services; falling back to local MissionStore")
+            ms = MissionStore(persist_file=pf) if pf else MissionStore()
+    else:
+        # No telemetry integration requested: create plain MissionStore (pass persist_file if supported)
+        ms = MissionStore(persist_file=pf) if pf else MissionStore()
+
+    proto = MLServerProtocol(ms)
 
     try:
         listen = loop.create_datagram_endpoint(lambda: proto, local_addr=(listen_host, listen_port))
@@ -551,14 +577,27 @@ def run_server(listen_host: str = "0.0.0.0", listen_port: int = None, persist_fi
             loop.run_until_complete(asyncio.sleep(0.1))
         except Exception:
             pass
+
+        # Stop telemetry server if it was started via start_services
+        if telemetry_server:
+            try:
+                loop.run_until_complete(telemetry_server.stop())
+                logger.info("Telemetry server stopped cleanly")
+            except Exception:
+                logger.exception("Failed to stop telemetry server cleanly")
+
         loop.close()
 
 
 if __name__ == "__main__":
+    # Configure logging so TelemetryServer logs are visible when running as a script
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s [%(name)s] %(message)s")
+
     parser = argparse.ArgumentParser(description="MissionLink ML server (Nave-Mãe)")
     parser.add_argument("--host", default="0.0.0.0", help="Host/interface to bind")
     parser.add_argument("--port", type=int, default=None, help="UDP port to bind (overrides ML_UDP_PORT)")
     parser.add_argument("--persist-file", default=None, help="Path to mission_store persist file (overrides ML_MISSION_STORE_FILE)")
+    parser.add_argument("--enable-telemetry", action="store_true", help="Also start the TelemetryServer and TelemetryStore in the same process")
     args = parser.parse_args()
 
     # If user passed --persist-file as a directory ensure directory exists
@@ -570,6 +609,6 @@ if __name__ == "__main__":
             logger.exception("Failed to create directory for persist-file")
 
     try:
-        run_server(listen_host=args.host, listen_port=args.port, persist_file=args.persist_file)
+        run_server(listen_host=args.host, listen_port=args.port, persist_file=args.persist_file, enable_telemetry=args.enable_telemetry)
     except Exception:
         traceback.print_exc()

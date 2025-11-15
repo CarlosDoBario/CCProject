@@ -1,91 +1,258 @@
 """
-Helper to connect TelemetryStore -> MissionStore.
+telemetry_hooks.py
 
-Provides a small, safe hook that you can register in the TelemetryStore so that every
-telemetry update:
- - registers/updates the rover in the MissionStore (last_seen/address),
- - optionally updates the rover 'state' in the MissionStore._rovers record (best-effort),
- - emits a mission_store event ("telemetry_received") so other parts of the system can react.
+Register hooks that map incoming telemetry events into MissionStore updates.
 
-Usage (example at Nave-Mãe startup or in tests):
+This module tries to be robust against a few possible TelemetryStore APIs:
+- telemetry_store.on(event, handler)
+- telemetry_store.add_listener(event, handler)
+- telemetry_store.register_callback(handler)
+- telemetry_store.register_hook(handler)
+- telemetry_store._emit / telemetry_store.emit (wraps emitter to intercept events)
 
-    from nave_mae.telemetry_store import TelemetryStore
-    from nave_mae.telemetry_hooks import register_telemetry_hooks
-
-    ts = TelemetryStore()
-    ms = MissionStore()
-    register_telemetry_hooks(ms, ts)
-
-Notes:
- - TelemetryStore.register_hook accepts sync or async callables. We register a sync hook
-   (simple function) so it executes quickly and non-blocking behavior is preserved by the store.
- - This file intentionally uses MissionStore public API where possible (register_rover, _emit).
-   It touches mission_store._rovers to set the rover state if telemetry includes a state field;
-   that is a pragmatic choice to keep the MissionStore in sync with telemetry. If you prefer to
-   avoid private attribute access, remove that part and rely on listeners of "telemetry_received".
+The registered callback attempts to extract a rover_id (from payload or header) and
+call mission_store.register_rover(rover_id, address) when possible. It logs an INFO
+message each time a rover is (re)registered so it's obvious in the ML server logs.
 """
-
-from typing import Any, Dict
 import logging
+from typing import Any, Callable, Optional
 
 logger = logging.getLogger("ml.telemetry_hooks")
 
 
-def register_telemetry_hooks(mission_store, telemetry_store) -> None:
+def _extract_rover_and_addr(payload: Any, maybe_addr: Any = None):
     """
-    Register the default hook(s) that forward telemetry updates into the MissionStore.
+    Try to find a rover id and address from the payload / args emitted by TelemetryServer.
+    Returns (rover_id: Optional[str], addr: Optional[tuple(ip, port)])
+    """
+    rover_id = None
+    addr = None
 
-    mission_store: instance of nave_mae.mission_store.MissionStore
-    telemetry_store: instance of TelemetryStore (has register_hook(fn))
-    """
-    def _hook(event_type: str, payload: Dict[str, Any]) -> None:
-        # We expect event_type == "telemetry" and payload {"rover_id": str, "telemetry": dict}
+    # If payload is a dict, try common keys
+    if isinstance(payload, dict):
+        rover_id = payload.get("rover_id") or payload.get("rover") or payload.get("id")
+        # payload may embed header
+        if not rover_id and "header" in payload and isinstance(payload["header"], dict):
+            rover_id = payload["header"].get("rover_id")
+        # payload may include an address dict
+        addr_info = payload.get("addr") or payload.get("address")
+        if isinstance(addr_info, dict):
+            ip = addr_info.get("ip")
+            port = addr_info.get("port")
+            try:
+                if ip and port is not None:
+                    addr = (ip, int(port))
+            except Exception:
+                addr = None
+
+    # If not found in payload, maybe emitter passed (payload, addr) style
+    if not rover_id and maybe_addr and isinstance(maybe_addr, (tuple, list)) and len(maybe_addr) >= 2:
+        if isinstance(payload, str):
+            rover_id = payload
+
+    # If maybe_addr could be an address and we didn't parse it yet
+    if addr is None and isinstance(maybe_addr, (tuple, list)) and len(maybe_addr) >= 2:
         try:
-            if event_type != "telemetry":
-                return
-            rover_id = payload.get("rover_id")
-            telemetry = payload.get("telemetry", {}) or {}
-
-            if not rover_id:
-                logger.debug("telemetry hook called with no rover_id; ignoring")
-                return
-
-            # Ensure MissionStore knows about this rover and update last_seen / address
-            try:
-                # mission_store.register_rover will update last_seen and address if provided
-                # We don't have a network address here (the TelemetryServer already registers address),
-                # so call register_rover with rover_id only to refresh last_seen and ensure an entry exists.
-                mission_store.register_rover(rover_id)
-            except Exception:
-                logger.exception("Failed to register rover %s in MissionStore from telemetry", rover_id)
-
-            # If telemetry contains an operational state, reflect it in the MissionStore rovers table.
-            # This is a convenience to keep rover state visible alongside missions. It's best-effort.
-            try:
-                state = telemetry.get("state")
-                if state:
-                    # MissionStore exposes get_rover() and register_rover(); use those where possible,
-                    # but to set state we update the internal _rovers dict (pragmatic).
-                    # This keeps the existing MissionStore API unchanged while synchronizing state.
-                    rv = mission_store.get_rover(rover_id)
-                    if rv is not None:
-                        # set the explicit state value
-                        mission_store._rovers.setdefault(rover_id, {})["state"] = state
-                    else:
-                        # if no entry exists, register_rover already created one; set state anyway
-                        mission_store._rovers.setdefault(rover_id, {})["state"] = state
-            except Exception:
-                logger.exception("Failed to update rover state in MissionStore for %s", rover_id)
-
-            # Emit a telemetry-specific event via the MissionStore so other hooks can react
-            try:
-                mission_store._emit("telemetry_received", {"rover_id": rover_id, "telemetry": telemetry})
-            except Exception:
-                logger.exception("Failed to emit telemetry_received for %s", rover_id)
-
+            addr = (maybe_addr[0], int(maybe_addr[1]))
         except Exception:
-            logger.exception("Unhandled exception in telemetry -> mission store hook")
+            addr = None
 
-    # Register the hook with the telemetry store
-    telemetry_store.register_hook(_hook)
-    logger.info("Registered telemetry -> MissionStore hook")
+    # Normalize rover_id if it is nested dict
+    if isinstance(rover_id, dict):
+        rover_id = rover_id.get("rover_id") or rover_id.get("id") or None
+
+    return rover_id, addr
+
+
+def register_telemetry_hooks(mission_store: Any, telemetry_store: Any) -> None:
+    """
+    Install hooks so telemetry events update the supplied MissionStore.
+
+    The function tries several strategies to attach the hook depending on the API
+    of telemetry_store. It logs an INFO when the hook is registered and also logs
+    an INFO each time a rover is registered by the hook.
+    """
+
+    def _core_register(rover_id: Optional[str], addr: Optional[tuple]):
+        if not rover_id:
+            return
+        try:
+            # Try preferred kwarg signature first
+            try:
+                mission_store.register_rover(rover_id, address=addr)
+                logger.info("telemetry_hooks: registered rover %s addr=%s", rover_id, addr)
+                return
+            except TypeError:
+                pass
+            # Fallback positional
+            try:
+                mission_store.register_rover(rover_id, addr)
+                logger.info("telemetry_hooks: registered rover %s addr=%s", rover_id, addr)
+                return
+            except TypeError:
+                pass
+            # Last resort: register by id only
+            try:
+                mission_store.register_rover(rover_id)
+                logger.info("telemetry_hooks: registered rover %s (no addr)", rover_id)
+                return
+            except Exception:
+                logger.exception("telemetry_hooks: failed to register rover %s", rover_id)
+        except Exception:
+            logger.exception("telemetry_hooks: unexpected error while registering rover %s", rover_id)
+
+    def _universal_handler(*args, **kwargs):
+        """
+        Universal wrapper that tolerates different hook signatures:
+          - (event_type, payload)
+          - (payload,)
+          - (payload, addr)
+          - (event_type, payload, addr, ...)
+        Extract payload and possible addr then call core register.
+        """
+        try:
+            event_type = None
+            payload = None
+            maybe_addr = None
+
+            if len(args) >= 2:
+                # common: (event_type, payload) or (payload, addr)
+                # Decide by type of first arg
+                if isinstance(args[0], str) and isinstance(args[1], dict):
+                    event_type = args[0]
+                    payload = args[1]
+                    if len(args) > 2:
+                        maybe_addr = args[2]
+                elif isinstance(args[0], dict):
+                    payload = args[0]
+                    maybe_addr = args[1]
+                else:
+                    # fallback: treat second arg as payload if dict
+                    if isinstance(args[1], dict):
+                        payload = args[1]
+                        maybe_addr = args[2] if len(args) > 2 else None
+                    else:
+                        payload = args[0]
+            elif len(args) == 1:
+                payload = args[0]
+            else:
+                # try kwargs
+                payload = kwargs.get("payload") or kwargs.get("data") or kwargs.get("telemetry")
+                maybe_addr = kwargs.get("addr") or kwargs.get("address")
+
+            # If event_type present and it's not telemetry, ignore unless payload contains telemetry
+            if event_type and event_type.lower() not in ("telemetry", "line", "data", "hello", "heartbeat"):
+                # still try to extract payload if present
+                pass
+
+            rover_id, addr = _extract_rover_and_addr(payload, maybe_addr)
+            _core_register(rover_id, addr)
+        except Exception:
+            logger.exception("telemetry_hooks: unexpected error in universal handler")
+
+    attached = False
+    try:
+        # Try classic evented APIs first
+        if hasattr(telemetry_store, "on"):
+            try:
+                telemetry_store.on("telemetry", _universal_handler)
+                attached = True
+            except Exception:
+                try:
+                    telemetry_store.on("line", _universal_handler)
+                    attached = True
+                except Exception:
+                    pass
+
+        if not attached and hasattr(telemetry_store, "add_listener"):
+            try:
+                telemetry_store.add_listener("telemetry", _universal_handler)
+                attached = True
+            except Exception:
+                try:
+                    telemetry_store.add_listener("line", _universal_handler)
+                    attached = True
+                except Exception:
+                    pass
+
+        if not attached and hasattr(telemetry_store, "subscribe"):
+            try:
+                telemetry_store.subscribe("telemetry", _universal_handler)
+                attached = True
+            except Exception:
+                try:
+                    telemetry_store.subscribe(_universal_handler)
+                    attached = True
+                except Exception:
+                    pass
+
+        if not attached and hasattr(telemetry_store, "register_callback"):
+            try:
+                telemetry_store.register_callback(_universal_handler)
+                attached = True
+            except Exception:
+                pass
+
+        # Support TelemetryStore.register_hook(fn) (the implementation in this repo)
+        if not attached and hasattr(telemetry_store, "register_hook"):
+            try:
+                telemetry_store.register_hook(_universal_handler)
+                attached = True
+            except Exception:
+                pass
+
+        # Alternative common names
+        if not attached and hasattr(telemetry_store, "register_handler"):
+            try:
+                telemetry_store.register_handler("telemetry", _universal_handler)
+                attached = True
+            except Exception:
+                try:
+                    telemetry_store.register_handler(_universal_handler)
+                    attached = True
+                except Exception:
+                    pass
+
+        if not attached and hasattr(telemetry_store, "register"):
+            try:
+                telemetry_store.register(_universal_handler)
+                attached = True
+            except Exception:
+                pass
+
+        # If the telemetry_store exposes an 'emit' or '_emit' method, we can wrap it
+        if not attached:
+            emitter_name = None
+            if hasattr(telemetry_store, "_emit"):
+                emitter_name = "_emit"
+            elif hasattr(telemetry_store, "emit"):
+                emitter_name = "emit"
+
+            if emitter_name is not None:
+                orig_emit = getattr(telemetry_store, emitter_name)
+
+                def _wrapped_emit(event, *args, **kwargs):
+                    try:
+                        if event in ("telemetry", "line", "data"):
+                            if len(args) >= 1:
+                                payload = args[0]
+                                maybe_addr = args[1] if len(args) > 1 else kwargs.get("addr")
+                                try:
+                                    _core_register(*_extract_rover_and_addr(payload, maybe_addr))
+                                except Exception:
+                                    logger.exception("telemetry_hooks: error calling core_register from wrapped emit")
+                        return orig_emit(event, *args, **kwargs)
+                    except Exception:
+                        logger.exception("telemetry_hooks: error in wrapped emitter; falling back to orig_emit")
+                        return orig_emit(event, *args, **kwargs)
+
+                setattr(telemetry_store, emitter_name, _wrapped_emit)
+                attached = True
+
+    except Exception:
+        logger.exception("telemetry_hooks: failed while attempting to attach hook")
+
+    if attached:
+        logger.info("Registered telemetry -> MissionStore hook")
+    else:
+        logger.warning("Could not attach telemetry -> MissionStore hook automatically; telemetry events may not update MissionStore")

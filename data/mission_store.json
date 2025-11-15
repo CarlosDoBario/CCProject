@@ -881,6 +881,24 @@
       },
       "last_seen": "2025-11-11T10:22:42+00:00",
       "state": "IDLE"
+    },
+    "R-INT": {
+      "rover_id": "R-INT",
+      "address": {
+        "ip": "127.0.0.1",
+        "port": 55468
+      },
+      "last_seen": "2025-11-15T17:18:53+00:00",
+      "state": "IDLE"
+    },
+    "R-SS": {
+      "rover_id": "R-SS",
+      "address": {
+        "ip": "127.0.0.1",
+        "port": 63788
+      },
+      "last_seen": "2025-11-15T17:27:15+00:00",
+      "state": "IDLE"
     }
   },
   "_next_mission_seq": 25
