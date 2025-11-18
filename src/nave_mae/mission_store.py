@@ -12,6 +12,14 @@ Features:
     - missions in ASSIGNED or IN_PROGRESS are reverted to CREATED and history records RECOVERED
     - emits hooks for recovered missions
 - constructor accepts persist_file (or reads ML_MISSION_STORE_FILE env var)
+
+Adaptations for binary TLV protocol:
+- new helper `update_from_telemetry(rover_id, telemetry)` that accepts canonical
+  telemetry dicts produced by common.binary_proto.tlv_to_canonical and:
+    - updates rover last_seen/address/state
+    - forwards progress updates to update_progress
+    - marks mission complete when applicable
+    - emits telemetry-related events via hooks
 """
 
 from typing import Dict, Any, Optional, Tuple, Callable, List
@@ -19,8 +27,8 @@ import json
 import os
 from threading import Lock
 import tempfile
-import shutil
 import time
+from datetime import datetime, timezone
 
 from common import utils, mission_schema
 
@@ -51,6 +59,13 @@ def _normalize_area(area: Optional[Dict[str, Any]]) -> Optional[Dict[str, float]
         "y2": y_high,
         "z2": z_high,
     }
+
+
+def _iso_from_ms(ms: int) -> str:
+    try:
+        return datetime.fromtimestamp(ms / 1000.0, tz=timezone.utc).isoformat(timespec="seconds")
+    except Exception:
+        return utils.now_iso()
 
 
 class MissionStore:
@@ -164,11 +179,27 @@ class MissionStore:
 
     # --- Rover management ---------------------------------------------------
     def register_rover(self, rover_id: str, address: Optional[Tuple[str, int]] = None) -> None:
+        """
+        Register or update a rover entry. `address` can be:
+          - tuple (ip, port)
+          - dict {"ip":..., "port":...}
+          - None
+        """
         with self._lock:
             r = self._rovers.setdefault(rover_id, {})
             r["rover_id"] = rover_id
             if address:
-                r["address"] = {"ip": address[0], "port": address[1]}
+                if isinstance(address, dict):
+                    # accept dict form
+                    ip = address.get("ip")
+                    port = address.get("port")
+                    if ip:
+                        r["address"] = {"ip": ip, "port": int(port) if port is not None else port}
+                elif isinstance(address, (tuple, list)) and len(address) >= 2:
+                    r["address"] = {"ip": address[0], "port": int(address[1])}
+                else:
+                    # unknown form: store as raw
+                    r["address"] = address
             r["last_seen"] = utils.now_iso()
             r.setdefault("state", "IDLE")
         logger.debug(f"Rover registered/updated: {rover_id}")
@@ -184,7 +215,8 @@ class MissionStore:
 
     def list_rovers(self) -> Dict[str, Dict[str, Any]]:
         with self._lock:
-            return dict(self._rovers)
+            # return shallow copy
+            return {k: dict(v) for k, v in self._rovers.items()}
 
     # --- Mission lifecycle -------------------------------------------------
     def create_mission(self, mission_spec: Dict[str, Any]) -> str:
@@ -288,7 +320,12 @@ class MissionStore:
             entry = {"ts": utils.now_iso(), "type": "PROGRESS", "rover": rover_id, "payload": progress_payload}
             m.setdefault("history", []).append(entry)
             m["state"] = "IN_PROGRESS"
-            m["last_progress_pct"] = progress_payload.get("progress_pct")
+            # store last_progress_pct only if present
+            if progress_payload.get("progress_pct") is not None:
+                try:
+                    m["last_progress_pct"] = float(progress_payload.get("progress_pct"))
+                except Exception:
+                    m["last_progress_pct"] = progress_payload.get("progress_pct")
             self._rovers.setdefault(rover_id, {})["state"] = "IN_MISSION"
         logger.debug(f"Progress updated for mission {mission_id} by {rover_id}: {progress_payload.get('progress_pct')}")
         self._emit("mission_progress", {"mission_id": mission_id, "rover_id": rover_id, "progress": progress_payload})
@@ -326,6 +363,102 @@ class MissionStore:
         self._emit("mission_cancel", {"mission_id": mission_id, "reason": reason})
         if self.persist_file:
             self.save_to_file()
+
+    # --- Telemetry integration helper ---------------------------------------
+    def update_from_telemetry(self, rover_id: str, telemetry: Dict[str, Any]) -> None:
+        """
+        Integrate canonical telemetry payloads into MissionStore.
+
+        Expected telemetry keys (canonical):
+          - mission_id (optional)
+          - progress_pct (optional)
+          - status (optional)  # string
+          - position, battery_level_pct, etc (optional)
+          - _msgid (optional)
+          - _ts_server_received_ms (optional)  # epoch ms set by server
+          - addr or _addr (optional)  # (ip,port) or {"ip":..,"port":..}
+
+        Behaviour:
+          - update rover last_seen/address/state
+          - if telemetry contains mission_id + progress_pct -> call update_progress
+          - if progress >= 100 or status indicates completion -> call complete_mission
+          - emit "telemetry" event via hooks
+          - persist if configured
+        """
+        try:
+            with self._lock:
+                # ensure rover entry
+                r = self._rovers.setdefault(rover_id, {"rover_id": rover_id, "state": "IDLE"})
+                # address handling
+                addr = telemetry.get("addr") or telemetry.get("_addr")
+                if addr:
+                    if isinstance(addr, dict):
+                        ip = addr.get("ip")
+                        port = addr.get("port")
+                        if ip:
+                            r["address"] = {"ip": ip, "port": int(port) if port is not None else port}
+                    elif isinstance(addr, (tuple, list)) and len(addr) >= 2:
+                        r["address"] = {"ip": addr[0], "port": int(addr[1])}
+                    else:
+                        r["address"] = addr
+                # last_seen
+                if telemetry.get("_ts_server_received_ms") is not None:
+                    try:
+                        r["last_seen"] = _iso_from_ms(int(telemetry.get("_ts_server_received_ms")))
+                    except Exception:
+                        r["last_seen"] = utils.now_iso()
+                else:
+                    r["last_seen"] = utils.now_iso()
+                # update state from status if present
+                status = telemetry.get("status")
+                if status:
+                    # store verbatim (string)
+                    r["state"] = str(status)
+                # persist rover change will be done after handling mission-specific updates
+
+                # emit telemetry event (before possibly completing mission)
+                self._emit("telemetry", {"rover_id": rover_id, "telemetry": dict(telemetry)})
+
+                # forward mission progress if present
+                mid = telemetry.get("mission_id")
+                prog = telemetry.get("progress_pct")
+                # treat progress numbers liberally: accept int/float/str
+                prog_num = None
+                if prog is not None:
+                    try:
+                        prog_num = float(prog)
+                    except Exception:
+                        prog_num = None
+
+                if mid and prog is not None:
+                    # call update_progress (which will persist)
+                    try:
+                        # pass the telemetry as the progress payload so history stores useful fields
+                        self.update_progress(mid, rover_id, telemetry)
+                    except Exception:
+                        logger.exception("update_progress from telemetry failed")
+
+                # check completion conditions: explicit status or progress >= 100
+                completed = False
+                if prog_num is not None and prog_num >= 100.0:
+                    completed = True
+                if isinstance(status, str) and status.lower() in ("completed", "complete", "success", "done"):
+                    completed = True
+
+                if completed and mid:
+                    try:
+                        self.complete_mission(mid, rover_id, telemetry)
+                    except Exception:
+                        logger.exception("complete_mission from telemetry failed")
+
+            # persist after telemetry handling (persist inside save_to_file acquires lock internally)
+            if self.persist_file:
+                try:
+                    self.save_to_file()
+                except Exception:
+                    logger.exception("Failed to save mission_store after telemetry update")
+        except Exception:
+            logger.exception("Unexpected error in update_from_telemetry")
 
     # --- Convenience / persistence utilities -------------------------------
     def snapshot(self) -> Dict[str, Any]:

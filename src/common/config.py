@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import logging
 import os
+import typing
 from typing import Any, Optional
 
 # Helper parsers --------------------------------------------------------------
@@ -72,6 +73,11 @@ MISSION_STORE_FILE: str = os.path.abspath(
     os.path.expanduser(_parse_str(_MSF_ENV, os.path.join(DATA_DIR, "mission_store.json")))
 )
 
+# Protocol identifiers and binary protocol version
+TS_PROTOCOL: str = _parse_str(os.environ.get("TS_PROTOCOL"), "TS/1.0")
+ML_PROTOCOL: str = _parse_str(os.environ.get("ML_PROTOCOL"), "ML/1.0")
+BINARY_PROTO_VERSION: int = _parse_int(os.environ.get("BINARY_PROTO_VERSION"), 1)
+
 # Networking defaults
 TELEMETRY_HOST: str = _parse_str(os.environ.get("TELEMETRY_HOST"), "127.0.0.1")
 TELEMETRY_PORT: int = _parse_int(os.environ.get("TELEMETRY_PORT"), 65080)
@@ -79,17 +85,29 @@ TELEMETRY_PORT: int = _parse_int(os.environ.get("TELEMETRY_PORT"), 65080)
 ML_HOST: str = _parse_str(os.environ.get("ML_HOST"), "0.0.0.0")
 ML_UDP_PORT: int = _parse_int(os.environ.get("ML_UDP_PORT"), 64070)
 
+# Datagram sizing (ML)
+ML_MAX_DATAGRAM_SIZE: int = _parse_int(os.environ.get("ML_MAX_DATAGRAM_SIZE"), 1200)
+
 # Time and retry tuning
-DEFAULT_UPDATE_INTERVAL_S: float = _parse_float(os.environ.get("DEFAULT_UPDATE_INTERVAL_S"), 1.0)
+# Default update interval: choose a reasonable default (30s). Change via env DEFAULT_UPDATE_INTERVAL_S.
+DEFAULT_UPDATE_INTERVAL_S: float = _parse_float(os.environ.get("DEFAULT_UPDATE_INTERVAL_S"), 30.0)
 TIMEOUT_TX_INITIAL: float = _parse_float(os.environ.get("TIMEOUT_TX_INITIAL"), 1.0)
 N_RETX: int = _parse_int(os.environ.get("N_RETX"), 3)
 BACKOFF_FACTOR: float = _parse_float(os.environ.get("BACKOFF_FACTOR"), 2.0)
 
 DEDUPE_RETENTION_S: int = _parse_int(os.environ.get("DEDUPE_RETENTION_S"), 60)
 DEDUPE_CLEANUP_INTERVAL_S: int = _parse_int(os.environ.get("DEDUPE_CLEANUP_INTERVAL_S"), 10)
+PENDING_CLEANUP_INTERVAL_S: int = _parse_int(os.environ.get("PENDING_CLEANUP_INTERVAL_S"), 60)
 
-# Logging
-LOG_LEVEL: str = _parse_str(os.environ.get("ML_LOG_LEVEL"), "INFO").upper()
+# Heartbeat / RTT estimation
+HEARTBEAT_INTERVAL_S: int = _parse_int(os.environ.get("HEARTBEAT_INTERVAL_S"), 30)
+RTT_EWMA_ALPHA: float = _parse_float(os.environ.get("RTT_EWMA_ALPHA"), 0.125)
+
+# Logging / metrics
+# Prefer component-specific env vars and then fall back to generic LOG_LEVEL
+_LOG_LEVEL_RAW = os.environ.get("TELEMETRY_LOG_LEVEL") or os.environ.get("ML_LOG_LEVEL") or os.environ.get("LOG_LEVEL") or "INFO"
+LOG_LEVEL: str = _parse_str(_LOG_LEVEL_RAW, "INFO").upper()
+METRICS_ENABLE: bool = _parse_bool(os.environ.get("METRICS_ENABLE"), True)
 
 # Small utility to configure logging if not already configured
 def configure_logging(level: Optional[str] = None, fmt: Optional[str] = None) -> None:
@@ -121,17 +139,25 @@ def configure_logging(level: Optional[str] = None, fmt: Optional[str] = None) ->
 __all__ = [
     "DATA_DIR",
     "MISSION_STORE_FILE",
+    "TS_PROTOCOL",
+    "ML_PROTOCOL",
+    "BINARY_PROTO_VERSION",
     "TELEMETRY_HOST",
     "TELEMETRY_PORT",
     "ML_HOST",
     "ML_UDP_PORT",
+    "ML_MAX_DATAGRAM_SIZE",
     "DEFAULT_UPDATE_INTERVAL_S",
     "TIMEOUT_TX_INITIAL",
     "N_RETX",
     "BACKOFF_FACTOR",
     "DEDUPE_RETENTION_S",
     "DEDUPE_CLEANUP_INTERVAL_S",
+    "PENDING_CLEANUP_INTERVAL_S",
+    "HEARTBEAT_INTERVAL_S",
+    "RTT_EWMA_ALPHA",
     "LOG_LEVEL",
+    "METRICS_ENABLE",
     "configure_logging",
     # helper parsers exported for tests/tools
     "_parse_bool",
@@ -142,31 +168,16 @@ __all__ = [
 
 # ---- Backwards compatibility with previous config.py names ----
 # These aliases make old imports/variables keep working while we centralize config.
-import os as _os
+# Minimal and consistent: expose old names pointing to the above values.
 
-# Protocol / UDP
-ML_PROTOCOL = _os.environ.get("ML_PROTOCOL", "ML/1.0")
-# If repo used ML_UDP_PORT env var, prefer it; otherwise use ML_UDP_PORT already set above
-ML_UDP_PORT = _parse_int(_os.environ.get("ML_UDP_PORT"), ML_UDP_PORT)
-ML_MAX_DATAGRAM_SIZE = _parse_int(_os.environ.get("ML_MAX_DATAGRAM_SIZE"), 1200)
+# Protocol / legacy names
+# ML_PROTOCOL already defined above from env if present; keep as alias
+# ML_UDP_PORT already defined above as ML_UDP_PORT
+# ML_MAX_DATAGRAM_SIZE already defined above
 
 # Retransmission / reliability aliases
-# TIMEOUT_TX_INITIAL, N_RETX, BACKOFF_FACTOR already defined above; keep same names
-ACK_JITTER = _parse_float(_os.environ.get("ACK_JITTER"), 0.5)
+ACK_JITTER = _parse_float(os.environ.get("ACK_JITTER"), 0.5)
 
-# Deduplication / retention
-DEDUPE_RETENTION_S = DEDUPE_RETENTION_S
-DEDUPE_CLEANUP_INTERVAL_S = DEDUPE_CLEANUP_INTERVAL_S
-PENDING_CLEANUP_INTERVAL_S = _parse_int(_os.environ.get("PENDING_CLEANUP_INTERVAL_S"), 60)
-
-# Heartbeat / RTT
-HEARTBEAT_INTERVAL_S = _parse_int(_os.environ.get("HEARTBEAT_INTERVAL_S"), 30)
-RTT_EWMA_ALPHA = _parse_float(_os.environ.get("RTT_EWMA_ALPHA"), 0.125)
-
-# Logging / metrics
-METRICS_ENABLE = _parse_bool(_os.environ.get("METRICS_ENABLE"), True)
-
-# Misc
-DEFAULT_UPDATE_INTERVAL_S = DEFAULT_UPDATE_INTERVAL_S
-ENV = _os.environ.get("ENV", "development")
+# Misc compatibility aliases
+ENV = _parse_str(os.environ.get("ENV"), "development")
 # ----------------------------------------------------------------

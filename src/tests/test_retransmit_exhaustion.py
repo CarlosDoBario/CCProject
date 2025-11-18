@@ -8,10 +8,8 @@ Unit test that validates server behavior when pending_outgoing retransmissions e
 - Run server._retransmit_loop for a short while and assert mission assignment was reverted
   (mission.assigned_rover == None) and that history contains ASSIGN_FAILED.
 """
-
 import asyncio
 import time
-import socket
 import pytest
 
 from nave_mae.mission_store import MissionStore
@@ -30,25 +28,29 @@ async def test_assign_revert_on_retransmit_exhaustion():
     server = MLServerProtocol(ms)
 
     # create a PendingOutgoing that represents an undeliverable MISSION_ASSIGN
+    now = time.time()
+    test_msgid = int(now * 1000) & 0xFFFFFFFFFFFFFFFF
     po = PendingOutgoing(
-        msg_id="po-test-1",
+        msg_id=test_msgid,
         packet=b"dummy",
         addr=("127.0.0.1", 9999),
-        created_at=time.time() - 60.0,
+        created_at=now - 60.0,
         timeout_s=0.5,
         message_type="MISSION_ASSIGN",
         mission_id=mid,
     )
     # mark attempts exceed config.N_RETX so logic will treat as exhausted immediately
     po.attempts = config.N_RETX + 1
-    po.next_timeout = time.time() - 1.0
+    po.next_timeout = now - 1.0
 
-    server.pending_outgoing[po.msg_id] = po
+    # Insert into server pending map (keyed by numeric msgid)
+    server.pending_outgoing[int(po.msg_id)] = po
 
     # run retransmit loop for a short while and then cancel
     task = asyncio.create_task(server._retransmit_loop())
     try:
-        await asyncio.sleep(0.7)  # one iteration expected
+        # one iteration of loop runs every ~0.5s; wait slightly longer to allow processing
+        await asyncio.sleep(0.7)
     finally:
         task.cancel()
         try:

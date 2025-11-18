@@ -11,17 +11,18 @@ Provides:
 - get_telemetry()
 - is_mission_complete()
 
-This implementation is deterministic and lightweight for tests:
-- It derives a mission duration from mission params when possible (e.g. frames*interval,
-  sample_count*estimated_time), otherwise uses a small default to finish quickly.
-- step(elapsed_s) advances progress based on elapsed seconds and the computed total_time.
-- get_telemetry returns fields expected by ml_client/mission_store.
+Notes on recent changes for the binary TLV protocol:
+- The simulator continues to produce a canonical telemetry dict (no JSON encoding here).
+- get_telemetry() now returns keys aligned with the canonical fields consumed by the
+  binary packers and MissionStore/TelemetryStore (mission_id, progress_pct, position,
+  battery_level_pct, status, errors, samples_collected, timestamp_ms).
+- Errors are represented as a list (possibly empty) under "errors" to be consistent
+  with TLV ERRORS (string) or PAYLOAD_JSON fallback that may embed arrays.
 """
-
 import math
 import random
+import time
 from typing import Dict, Any, Optional, Tuple
-
 
 class RoverSim:
     def __init__(self, rover_id: str, position: Tuple[float, float, float] = (0.0, 0.0, 0.0)):
@@ -32,7 +33,7 @@ class RoverSim:
         self.progress_pct: float = 0.0
         self.samples_collected: int = 0
         self.battery_level_pct: float = 100.0
-        self.last_error: Optional[Dict[str, Any]] = None
+        self.errors: list = []   # list of error dicts, empty when none
         self._elapsed_on_mission: float = 0.0
         self._mission_total_time: float = 10.0  # seconds, default short duration for tests
 
@@ -75,7 +76,7 @@ class RoverSim:
         self.state = "RUNNING"
         self.progress_pct = 0.0
         self.samples_collected = 0
-        self.last_error = None
+        self.errors = []
         self._elapsed_on_mission = 0.0
         # compute mission total time from params so tests complete quickly
         self._mission_total_time = float(mission_spec.get("max_duration_s") or self._estimate_mission_total_time(mission_spec))
@@ -125,7 +126,8 @@ class RoverSim:
 
         # Small probability to inject a transient non-critical error (rare)
         if random.random() < 0.0005:
-            self.last_error = {"code": "SIM-RAND-ERR", "description": "Transient simulated sensor glitch"}
+            err = {"code": "SIM-RAND-ERR", "description": "Transient simulated sensor glitch"}
+            self.errors.append(err)
             self.state = "ERROR"
             return
 
@@ -147,13 +149,18 @@ class RoverSim:
     def get_telemetry(self) -> Dict[str, Any]:
         """
         Return a telemetry dict used by ml_client to build PROGRESS/MISSION_COMPLETE bodies.
+
+        The dict matches the canonical fields expected by the binary TLV packers / MissionStore:
+          - mission_id, progress_pct, position, battery_level_pct, status, errors, samples_collected, timestamp_ms
         """
+        ts_ms = int(time.time() * 1000)
         return {
             "mission_id": (self.current_mission.get("mission_id") if self.current_mission else None),
             "progress_pct": self.progress_pct,
             "position": dict(self.position),
             "battery_level_pct": round(self.battery_level_pct, 1),
             "status": self.state.lower(),
-            "last_error": self.last_error,
+            "errors": list(self.errors),
             "samples_collected": int(self.samples_collected),
+            "timestamp_ms": ts_ms,
         }

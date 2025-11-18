@@ -3,61 +3,79 @@ telemetry_hooks.py
 
 Register hooks that map incoming telemetry events into MissionStore updates.
 
-This module tries to be robust against a few possible TelemetryStore APIs:
-- telemetry_store.on(event, handler)
-- telemetry_store.add_listener(event, handler)
-- telemetry_store.register_callback(handler)
-- telemetry_store.register_hook(handler)
-- telemetry_store._emit / telemetry_store.emit (wraps emitter to intercept events)
-
-The registered callback attempts to extract a rover_id (from payload or header) and
-call mission_store.register_rover(rover_id, address) when possible. It logs an INFO
-message each time a rover is (re)registered so it's obvious in the ML server logs.
+Adaptado para o formato binário canonical (dicts produzidos por binary_proto.tlv_to_canonical).
+O hook tenta:
+ - extrair rover_id e addr do payload (várias formas possíveis),
+ - chamar mission_store.register_rover(rover_id, address=...) quando possível,
+ - invocar mission_store.update_from_telemetry(rover_id, telemetry) se disponível,
+   caso contrário tentar encaminhar para update_progress/complete conforme o payload.
 """
+
+from typing import Any, Callable, Optional, Tuple, Dict
 import logging
-from typing import Any, Callable, Optional
+import inspect
 
-logger = logging.getLogger("ml.telemetry_hooks")
+from common import utils
+
+logger = utils.get_logger("nave_mae.telemetry_hooks")
 
 
-def _extract_rover_and_addr(payload: Any, maybe_addr: Any = None):
+def _extract_rover_and_addr(payload: Any, maybe_addr: Any = None) -> Tuple[Optional[str], Optional[Tuple[str, int]]]:
     """
     Try to find a rover id and address from the payload / args emitted by TelemetryServer.
-    Returns (rover_id: Optional[str], addr: Optional[tuple(ip, port)])
+    Returns (rover_id: Optional[str], addr: Optional[(ip, port)]).
+    Accepts canonical telemetry dicts (with keys like 'rover_id', '_addr', 'position', etc.)
+    and older shapes that telemetry_store implementations may emit.
     """
-    rover_id = None
-    addr = None
+    rover_id: Optional[str] = None
+    addr: Optional[Tuple[str, int]] = None
 
-    # If payload is a dict, try common keys
+    # If payload is a dict, try common keys (canonical)
     if isinstance(payload, dict):
+        # canonical patterns
         rover_id = payload.get("rover_id") or payload.get("rover") or payload.get("id")
-        # payload may embed header
-        if not rover_id and "header" in payload and isinstance(payload["header"], dict):
-            rover_id = payload["header"].get("rover_id")
-        # payload may include an address dict
-        addr_info = payload.get("addr") or payload.get("address")
+        # some telemetry_store wrap telemetry inside {"telemetry": {...}}
+        if not rover_id and "telemetry" in payload and isinstance(payload["telemetry"], dict):
+            rover_id = payload["telemetry"].get("rover_id") or payload["telemetry"].get("rover")
+            inner = payload["telemetry"]
+            # prefer inner addr if present
+            addr_info = inner.get("_addr") or inner.get("addr") or inner.get("address")
+        else:
+            addr_info = payload.get("_addr") or payload.get("addr") or payload.get("address")
+
+        # If addr_info is dict with ip/port
         if isinstance(addr_info, dict):
             ip = addr_info.get("ip")
             port = addr_info.get("port")
             try:
                 if ip and port is not None:
-                    addr = (ip, int(port))
+                    addr = (str(ip), int(port))
+            except Exception:
+                addr = None
+        # If addr_info is tuple/list
+        elif isinstance(addr_info, (tuple, list)) and len(addr_info) >= 2:
+            try:
+                addr = (str(addr_info[0]), int(addr_info[1]))
             except Exception:
                 addr = None
 
     # If not found in payload, maybe emitter passed (payload, addr) style
     if not rover_id and maybe_addr and isinstance(maybe_addr, (tuple, list)) and len(maybe_addr) >= 2:
+        # sometimes payload is rover_id string and maybe_addr is (ip,port)
         if isinstance(payload, str):
             rover_id = payload
+        # if payload is dict but no rover_id, try to glean from payload keys
+        elif isinstance(payload, dict):
+            rover_id = payload.get("rover_id") or payload.get("rover")
 
-    # If maybe_addr could be an address and we didn't parse it yet
+    # If we still don't have addr but maybe_addr looks like an address, use it
     if addr is None and isinstance(maybe_addr, (tuple, list)) and len(maybe_addr) >= 2:
         try:
-            addr = (maybe_addr[0], int(maybe_addr[1]))
+            addr = (str(maybe_addr[0]), int(maybe_addr[1]))
         except Exception:
             addr = None
 
-    # Normalize rover_id if it is nested dict
+    # Normalise rover_id if nested dict
     if isinstance(rover_id, dict):
         rover_id = rover_id.get("rover_id") or rover_id.get("id") or None
 
@@ -73,7 +91,7 @@ def register_telemetry_hooks(mission_store: Any, telemetry_store: Any) -> None:
     an INFO each time a rover is registered by the hook.
     """
 
-    def _core_register(rover_id: Optional[str], addr: Optional[tuple]):
+    def _core_register(rover_id: Optional[str], addr: Optional[Tuple[str, int]]):
         if not rover_id:
             return
         try:
@@ -101,6 +119,47 @@ def register_telemetry_hooks(mission_store: Any, telemetry_store: Any) -> None:
         except Exception:
             logger.exception("telemetry_hooks: unexpected error while registering rover %s", rover_id)
 
+    def _handle_mission_from_telemetry(rover_id: str, telemetry: Dict[str, Any]) -> None:
+        """
+        Forward telemetry to mission_store. Prefer mission_store.update_from_telemetry if available.
+        Fallback to calling update_progress/complete as appropriate.
+        """
+        try:
+            if hasattr(mission_store, "update_from_telemetry") and callable(getattr(mission_store, "update_from_telemetry")):
+                try:
+                    mission_store.update_from_telemetry(rover_id, telemetry)
+                    return
+                except Exception:
+                    logger.exception("telemetry_hooks: update_from_telemetry raised exception; falling back")
+            # Fallback behaviour: if telemetry contains mission_id + progress_pct -> update_progress
+            mid = telemetry.get("mission_id")
+            prog = telemetry.get("progress_pct")
+            status = telemetry.get("status")
+            prog_num = None
+            if prog is not None:
+                try:
+                    prog_num = float(prog)
+                except Exception:
+                    prog_num = None
+            if mid and prog is not None and hasattr(mission_store, "update_progress"):
+                try:
+                    mission_store.update_progress(mid, rover_id, telemetry)
+                except Exception:
+                    logger.exception("telemetry_hooks: update_progress failed for %s", mid)
+            # If mission appears completed, call complete_mission
+            completed = False
+            if prog_num is not None and prog_num >= 100.0:
+                completed = True
+            if isinstance(status, str) and status.lower() in ("completed", "complete", "success", "done"):
+                completed = True
+            if completed and mid and hasattr(mission_store, "complete_mission"):
+                try:
+                    mission_store.complete_mission(mid, rover_id, telemetry)
+                except Exception:
+                    logger.exception("telemetry_hooks: complete_mission failed for %s", mid)
+        except Exception:
+            logger.exception("telemetry_hooks: unexpected error in mission forwarding")
+
     def _universal_handler(*args, **kwargs):
         """
         Universal wrapper that tolerates different hook signatures:
@@ -108,51 +167,76 @@ def register_telemetry_hooks(mission_store: Any, telemetry_store: Any) -> None:
           - (payload,)
           - (payload, addr)
           - (event_type, payload, addr, ...)
-        Extract payload and possible addr then call core register.
+        Extract payload and possible addr then call core register and mission forwarding.
         """
         try:
             event_type = None
             payload = None
             maybe_addr = None
 
+            # Parse positional args
             if len(args) >= 2:
                 # common: (event_type, payload) or (payload, addr)
-                # Decide by type of first arg
                 if isinstance(args[0], str) and isinstance(args[1], dict):
                     event_type = args[0]
                     payload = args[1]
-                    if len(args) > 2:
-                        maybe_addr = args[2]
+                    maybe_addr = args[2] if len(args) > 2 else None
                 elif isinstance(args[0], dict):
                     payload = args[0]
                     maybe_addr = args[1]
                 else:
-                    # fallback: treat second arg as payload if dict
+                    # fallback: second arg might be payload
                     if isinstance(args[1], dict):
                         payload = args[1]
                         maybe_addr = args[2] if len(args) > 2 else None
                     else:
                         payload = args[0]
+                        maybe_addr = args[1]
             elif len(args) == 1:
                 payload = args[0]
             else:
-                # try kwargs
+                # kwargs fallback
                 payload = kwargs.get("payload") or kwargs.get("data") or kwargs.get("telemetry")
                 maybe_addr = kwargs.get("addr") or kwargs.get("address")
 
-            # If event_type present and it's not telemetry, ignore unless payload contains telemetry
-            if event_type and event_type.lower() not in ("telemetry", "line", "data", "hello", "heartbeat"):
-                # still try to extract payload if present
-                pass
+            # If payload is a wrapper like {"rover_id":..., "telemetry": {...}} flatten
+            if isinstance(payload, dict) and "telemetry" in payload and isinstance(payload["telemetry"], dict):
+                inner = payload["telemetry"]
+                # Merge header fields into inner if present
+                merged = dict(inner)
+                # Copy potential metadata
+                for k in ("_addr", "addr", "timestamp", "ts", "ts_ms", "_ts_server_received_ms"):
+                    if k in payload and k not in merged:
+                        merged[k] = payload[k]
+                payload = merged
 
+            # Only handle telemetry-like events primarily, but keep tolerant to other event names
             rover_id, addr = _extract_rover_and_addr(payload, maybe_addr)
+
+            # Register rover (updates last_seen/address)
             _core_register(rover_id, addr)
+
+            # Forward telemetry to mission store if we have a telemetry dict
+            telemetry_payload = None
+            if isinstance(payload, dict):
+                # If the payload wrapper had 'rover_id' and 'telemetry' then we already flattened above
+                telemetry_payload = payload.get("telemetry") if payload.get("telemetry") and isinstance(payload.get("telemetry"), dict) else payload
+            # If telemetry_payload is None and payload is a string id, nothing to forward
+            if rover_id and telemetry_payload and isinstance(telemetry_payload, dict):
+                # ensure telemetry has rover_id and addr included for convenience
+                if "rover_id" not in telemetry_payload:
+                    telemetry_payload["rover_id"] = rover_id
+                if "_addr" not in telemetry_payload and addr:
+                    telemetry_payload["_addr"] = addr
+                # Call mission forwarding helper
+                _handle_mission_from_telemetry(rover_id, telemetry_payload)
+
         except Exception:
             logger.exception("telemetry_hooks: unexpected error in universal handler")
 
     attached = False
     try:
-        # Try classic evented APIs first
+        # Try classic evented APIs first (order matters: prefer specific APIs)
         if hasattr(telemetry_store, "on"):
             try:
                 telemetry_store.on("telemetry", _universal_handler)
@@ -238,7 +322,17 @@ def register_telemetry_hooks(mission_store: Any, telemetry_store: Any) -> None:
                                 payload = args[0]
                                 maybe_addr = args[1] if len(args) > 1 else kwargs.get("addr")
                                 try:
-                                    _core_register(*_extract_rover_and_addr(payload, maybe_addr))
+                                    rid, a = _extract_rover_and_addr(payload, maybe_addr)
+                                    _core_register(rid, a)
+                                    # forward mission telemetry if payload is dict
+                                    if isinstance(payload, dict):
+                                        tp = payload.get("telemetry") if payload.get("telemetry") and isinstance(payload.get("telemetry"), dict) else payload
+                                        if rid and isinstance(tp, dict):
+                                            if "rover_id" not in tp:
+                                                tp["rover_id"] = rid
+                                            if "_addr" not in tp and a:
+                                                tp["_addr"] = a
+                                            _handle_mission_from_telemetry(rid, tp)
                                 except Exception:
                                     logger.exception("telemetry_hooks: error calling core_register from wrapped emit")
                         return orig_emit(event, *args, **kwargs)

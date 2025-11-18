@@ -1,16 +1,26 @@
+#!/usr/bin/env python3
 """
 telemetry_launcher.py
 
 Small helper library to start a TelemetryServer (TelemetryStream) for the
-Nave-Mãe. Updated to support two modes and to attempt to attach telemetry hooks
-to both the TelemetryStore and the TelemetryServer object (some implementations
-expose subscription APIs on the server instead of the store).
+Nave-Mãe. Updated to work with the binary TelemetryServer/TelemetryStore and
+the canonical telemetry payloads produced by common.binary_proto.
+
+Behaviour:
+ - creates MissionStore and TelemetryStore when not provided
+ - registers telemetry -> mission hooks via nave_mae.telemetry_hooks.register_telemetry_hooks
+ - starts TelemetryServer and returns handles for tests/cleanup
 """
+
+from __future__ import annotations
+
 import asyncio
 import logging
 from typing import Optional, Dict, Any
 
-_logger = logging.getLogger("ml.telemetry_launcher")
+from common import config, utils
+
+_logger = utils.get_logger("ml.telemetry_launcher")
 
 
 async def start_telemetry_server(
@@ -27,13 +37,6 @@ async def start_telemetry_server(
       - "ms": the MissionStore instance used
       - "ts": the TelemetryStore instance used
       - "telemetry_server": the running TelemetryServer instance
-
-    Behavior:
-    - If mission_store is None, attempt to import nave_mae.mission_store.MissionStore and create one.
-      If MissionStore accepts a persist_file argument, pass persist_file when creating.
-    - If telemetry_store is None, create a TelemetryStore instance.
-    - Register telemetry -> mission hooks (via nave_mae.telemetry_hooks.register_telemetry_hooks).
-    - Start TelemetryServer and return references.
     """
     # Lazy imports to avoid circular imports on module import
     try:
@@ -62,6 +65,7 @@ async def start_telemetry_server(
     if telemetry_store is None:
         try:
             telemetry_store = TelemetryStore()
+            _logger.info("Created TelemetryStore (history_size default)")
         except Exception:
             _logger.exception("Failed to create TelemetryStore")
             raise
@@ -73,6 +77,7 @@ async def start_telemetry_server(
         _logger.exception("Failed to register telemetry hooks (pre-start) — will try again after server.start()")
 
     # Create and start TelemetryServer
+    server = None
     try:
         server = TelemetryServer(mission_store=mission_store, telemetry_store=telemetry_store, host=host, port=port)
         await server.start()
@@ -82,7 +87,6 @@ async def start_telemetry_server(
         raise
 
     # After server.start(), some TelemetryStore or TelemetryServer implementations expose event APIs only then.
-    # Try registering hooks again to ensure attachment succeeds.
     attached = False
     try:
         # First try with the telemetry_store (it may have become usable after start)
@@ -124,8 +128,15 @@ def run_server_forever(host: str = "127.0.0.1", port: int = 65080, persist_file:
     CLI helper to run TelemetryServer standalone (creates its own MissionStore and TelemetryStore).
     Blocks until Ctrl-C.
     """
+    # Ensure logging configured consistently with config
+    try:
+        config.configure_logging()
+    except Exception:
+        logging.basicConfig(level=logging.INFO)
+
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
+    services = {}
     try:
         services = loop.run_until_complete(start_telemetry_server(host=host, port=port, persist_file=persist_file))
         _logger.info("Telemetry server started; press Ctrl-C to stop")
@@ -150,8 +161,7 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="Start TelemetryServer (Nave-Mãe) standalone")
     parser.add_argument("--host", default="127.0.0.1", help="Host to bind telemetry server")
-    parser.add_argument("--port", type=int, default=65080, help="Telemetry server port")
+    parser.add_argument("--port", type=int, default=config.TELEMETRY_PORT, help="Telemetry server port")
     parser.add_argument("--persist-file", default=None, help="Optional persist file to pass to MissionStore (standalone)")
     args = parser.parse_args()
-    logging.basicConfig(level=logging.INFO)
     run_server_forever(host=args.host, port=args.port, persist_file=args.persist_file)

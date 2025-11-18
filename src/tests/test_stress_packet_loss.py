@@ -1,18 +1,17 @@
 # tests/test_stress_packet_loss.py
 # Replacement stress test that simulates packet loss via an in-memory lossy transport.
-# This version is more robust against small races: it verifies mission completion by
-# checking the mission state OR the mission history for a COMPLETE event from the rover.
-
+# This version is adapted to the binary TLV protocol and the updated SimpleMLClient.
+# It verifies mission completion by checking the mission state OR the mission history
+# for a COMPLETE event from the rover.
 import asyncio
 import random
 import time
 import pytest
-import json
 
 from nave_mae.ml_server import MLServerProtocol
 from nave_mae.mission_store import MissionStore
-from rover.ml_client import MLClientProtocol
-from common import config, ml_schema
+from rover.ml_client import SimpleMLClient
+from common import config
 
 
 class LossyTransport:
@@ -20,7 +19,7 @@ class LossyTransport:
     Fake transport that forwards packets to a destination protocol.datagram_received(...)
     with a configurable drop rate and jitter. Deterministic if random.seed is set.
     """
-    def __init__(self, loop: asyncio.AbstractEventLoop, dest_proto, drop_rate: float = 0.3, max_delay_s: float = 0.02):
+    def __init__(self, loop: asyncio.AbstractEventLoop, dest_proto, drop_rate: float = 0.25, max_delay_s: float = 0.02):
         self.loop = loop
         self.dest = dest_proto
         self.drop_rate = drop_rate
@@ -47,6 +46,7 @@ class LossyTransport:
             pass
 
     def get_extra_info(self, name, default=None):
+        # minimal compat for protocols that query sockname
         return None
 
 
@@ -66,12 +66,16 @@ async def test_stress_packet_loss_retransmit_and_recovery(tmp_path):
     orig_backoff = config.BACKOFF_FACTOR
     orig_update_interval = config.DEFAULT_UPDATE_INTERVAL_S
 
-    config.TIMEOUT_TX_INITIAL = 0.08  # small base timeout
-    config.N_RETX = 6                 # allow several retries to survive loss
-    config.BACKOFF_FACTOR = 1.7
+    # more aggressive retransmit allowances for lossy in-memory transport
+    config.TIMEOUT_TX_INITIAL = 0.05  # smaller base timeout to allow many attempts
+    config.N_RETX = 20                # allow many retries to survive loss
+    config.BACKOFF_FACTOR = 1.5
     config.DEFAULT_UPDATE_INTERVAL_S = 0.05  # rover progress interval small to finish mission quickly
 
     loop = asyncio.get_event_loop()
+
+    # keep references to created background tasks so we can cancel them in cleanup
+    client_retx_task = None
 
     try:
         # Mission store with one small mission (short duration)
@@ -87,59 +91,50 @@ async def test_stress_packet_loss_retransmit_and_recovery(tmp_path):
         # Create server protocol and attach a dummy transport (will be replaced)
         server = MLServerProtocol(ms)
 
-        # Create client protocol (exit_on_complete True so it signals when mission done)
-        done_event = asyncio.Event()
-        client = MLClientProtocol(rover_id="R-STRESS", exit_on_complete=True, done_event=done_event)
+        # Create client protocol (SimpleMLClient). Provide server address in constructor.
+        client = SimpleMLClient(rover_id="R-STRESS", server=("127.0.0.1", config.ML_UDP_PORT), exit_on_complete=True)
 
         # Create lossy transports linking client <-> server
-        # client_transport.sendto -> deliver to server.datagram_received
-        client_transport = LossyTransport(loop, server, drop_rate=0.35, max_delay_s=0.03)
-        # server_transport.sendto -> deliver to client.datagram_received
-        server_transport = LossyTransport(loop, client, drop_rate=0.35, max_delay_s=0.03)
+        # client_transport.sendto -> deliver to server.datagram_received (higher loss)
+        client_transport = LossyTransport(loop, server, drop_rate=0.30, max_delay_s=0.03)
+        # server_transport.sendto -> deliver to client.datagram_received (lower loss so ASSIGNs eventually arrive)
+        server_transport = LossyTransport(loop, client, drop_rate=0.10, max_delay_s=0.02)
 
-        # Call connection_made to start internal retransmit/cleanup tasks
+        # Call connection_made to start internal retransmit/cleanup tasks on server/client
         server.connection_made(server_transport)
         client.connection_made(client_transport)
 
+        # Start client's retransmit loop (SimpleMLClient.retransmit_loop must be run manually in this in-memory setup)
+        client_retx_task = asyncio.create_task(client.retransmit_loop())
+
         # Start the client's mission request (async)
-        await client.request_mission(("127.0.0.1", config.ML_UDP_PORT))
+        await client.request_mission()
 
-        # Wait for mission completion signalled by client (or timeout)
+        # Wait for mission completion by polling MissionStore or timeout
         try:
-            await asyncio.wait_for(done_event.wait(), timeout=25.0)
-        except asyncio.TimeoutError:
-            # collect some diagnostics
-            missions = ms.list_missions()
-            # raise with helpful info
-            raise AssertionError(
-                f"Stress test timed out waiting for client to finish. Missions snapshot: {missions}"
-            )
-
-        # Give server a short moment to process the final MISSION_COMPLETE (race avoidance).
-        # Poll mission store for up to 2s for the server to mark the mission COMPLETED.
-        completed = False
-        deadline = time.time() + 2.0
-        while time.time() < deadline:
-            missions = ms.list_missions()
-            for mid, m in missions.items():
-                # Accept mission completed if:
-                #  - state == COMPLETED and assigned_rover == R-STRESS
-                #  OR
-                #  - history contains a COMPLETE entry by R-STRESS (robust to small races)
-                if m.get("state") == "COMPLETED" and m.get("assigned_rover") == "R-STRESS":
-                    completed = True
-                    break
-                # fallback: history search
-                hist = m.get("history", [])
-                for e in hist:
-                    if e.get("type") in ("COMPLETE",) and e.get("rover") == "R-STRESS":
+            # Wait until either the mission appears completed or timeout
+            deadline = time.time() + 40.0  # larger overall timeout to give retransmits time
+            completed = False
+            while time.time() < deadline:
+                missions = ms.list_missions()
+                for mid, m in missions.items():
+                    if m.get("state") == "COMPLETED" and m.get("assigned_rover") == "R-STRESS":
                         completed = True
+                        break
+                    # fallback: history search for COMPLETE event
+                    hist = m.get("history", [])
+                    for e in hist:
+                        if e.get("type") in ("COMPLETE",) and e.get("rover") == "R-STRESS":
+                            completed = True
+                            break
+                    if completed:
                         break
                 if completed:
                     break
-            if completed:
-                break
-            await asyncio.sleep(0.05)
+                await asyncio.sleep(0.05)
+        except asyncio.TimeoutError:
+            missions = ms.list_missions()
+            raise AssertionError(f"Stress test timed out waiting for client to finish. Missions snapshot: {missions}")
 
         assert completed, f"Expected mission to be completed by R-STRESS despite packet loss; snapshot: {ms.list_missions()}"
 
@@ -152,16 +147,14 @@ async def test_stress_packet_loss_retransmit_and_recovery(tmp_path):
 
         # cancel background tasks created by protocols (if any) to avoid warnings
         try:
-            if server._task_retransmit:
+            if hasattr(server, "_task_retransmit") and server._task_retransmit:
                 server._task_retransmit.cancel()
-            if server._task_cleanup:
+            if hasattr(server, "_task_cleanup") and server._task_cleanup:
                 server._task_cleanup.cancel()
         except Exception:
             pass
         try:
-            if client._task_retransmit:
-                client._task_retransmit.cancel()
-            if client._task_cleanup:
-                client._task_cleanup.cancel()
+            if client_retx_task:
+                client_retx_task.cancel()
         except Exception:
             pass

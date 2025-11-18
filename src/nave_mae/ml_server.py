@@ -1,140 +1,97 @@
 #!/usr/bin/env python3
 """
-ml_server.py
-Implementação MissionLink (ML) UDP server (Nave-Mãe)
+ml_server.py (binary ML/UDP version)
 
-Alterações principais:
-- run_server agora aceita persist_file (passa para MissionStore) e usa a env var ML_MISSION_STORE_FILE
-  ou um ficheiro padrão data/mission_store.json se não for explicitado.
-- Cria explicitamente um novo event loop com asyncio.new_event_loop() e regista com asyncio.set_event_loop(loop)
-  para compatibilidade com Python 3.10+.
-- Adicionados argumentos CLI (--persist-file, --host, --port).
-- Adicionada opção --enable-telemetry para arrancar TelemetryServer/TelemetryStore no mesmo processo.
-- Ao executar como script, configuramos logging.basicConfig para que os logs do TelemetryServer apareçam no terminal.
+This module implements a DatagramProtocol-based ML server with:
+- TLV/binary parsing via common.binary_proto
+- reliable send with pending_outgoing & retransmit/backoff
+- ACK handling and deduplication
+- helpers for sending mission_cancel and handling its ACK
 """
+
+from __future__ import annotations
 
 import asyncio
 import time
-import contextlib
-from typing import Dict, Any, Optional, Tuple
-import traceback
-import os
-import argparse
 import logging
+import struct
+import threading
+import json
+from typing import Dict, Any, Optional, Tuple
 
-from common import ml_schema, config, utils
+from common import binary_proto, config, utils
 
-logger = utils.get_logger("ml.server")
+logger = utils.get_logger("nave_mae.ml_server")
 
-# Importar mission_store se disponível; else fornecer um minimal fallback.
+
 try:
     from nave_mae.mission_store import MissionStore  # type: ignore
 except Exception:
-    logger.warning("nave_mae.mission_store not found — using minimal in-memory fallback")
+    logger.warning("nave_mae.mission_store not available; using lightweight fallback")
 
     class MissionStore:
-        """
-        Minimal fallback mission store for development.
-        """
         def __init__(self, persist_file: Optional[str] = None):
-            self.missions: Dict[str, Dict[str, Any]] = {}
-            self.rovers: Dict[str, Dict[str, Any]] = {}
+            self.missions = {}
+            self.rovers = {}
             self._next_mission = 1
 
-        def register_rover(self, rover_id: str, address: Tuple[str, int]):
-            self.rovers[rover_id] = {
-                "rover_id": rover_id,
-                "address": address,
-                "state": "IDLE",
-                "last_seen": utils.now_iso(),
-            }
+        def register_rover(self, rover_id, address=None):
+            self.rovers[rover_id] = {"rover_id": rover_id, "address": address, "state": "IDLE", "last_seen": utils.now_iso()}
 
-        def create_mission(self, mission_spec: Dict[str, Any]) -> str:
-            mid = f"M-{self._next_mission:03d}"
-            self._next_mission += 1
-            m = mission_spec.copy()
-            m.update({"mission_id": mid, "state": "CREATED", "assigned_rover": None, "history": []})
-            self.missions[mid] = m
-            return mid
-
-        def get_pending_mission_for_rover(self, rover_id: str) -> Optional[Dict[str, Any]]:
+        def get_pending_mission_for_rover(self, rover_id):
             for m in self.missions.values():
                 if m.get("assigned_rover") is None:
                     return m
             return None
 
-        def assign_mission_to_rover(self, mission: Dict[str, Any], rover_id: str):
-            mid = mission["mission_id"]
+        def assign_mission_to_rover(self, mission, rover_id):
             mission["assigned_rover"] = rover_id
             mission["state"] = "ASSIGNED"
             mission["assigned_at"] = utils.now_iso()
-            self.rovers.setdefault(rover_id, {})["state"] = "ASSIGNED"
 
-        def update_progress(self, mission_id: str, rover_id: str, progress_payload: Dict[str, Any]):
+        def update_progress(self, mission_id, rover_id, payload):
+            pass
+
+        def complete_mission(self, mission_id, rover_id, payload):
+            pass
+
+        def unassign_mission(self, mission_id, reason=None):
             m = self.missions.get(mission_id)
             if m:
-                m.setdefault("history", []).append({"ts": utils.now_iso(), "type": "PROGRESS", "payload": progress_payload})
-                m["state"] = "IN_PROGRESS"
-                self.rovers.setdefault(rover_id, {})["state"] = "IN_MISSION"
+                m["assigned_rover"] = None
+                m.setdefault("history", []).append({"ts": utils.now_iso(), "type": "UNASSIGNED", "reason": reason})
 
-        def complete_mission(self, mission_id: str, rover_id: str, result_payload: Dict[str, Any]):
+        def cancel_mission(self, mission_id, reason=None):
             m = self.missions.get(mission_id)
             if m:
-                m["state"] = "COMPLETED"
-                m.setdefault("history", []).append({"ts": utils.now_iso(), "type": "COMPLETE", "payload": result_payload})
-                self.rovers.setdefault(rover_id, {})["state"] = "IDLE"
+                m["state"] = "CANCELLED"
+                m.setdefault("history", []).append({"ts": utils.now_iso(), "type": "CANCEL", "reason": reason})
 
-        def list_missions(self):
-            return list(self.missions.values())
-
-        def get_mission(self, mission_id: str):
+        def get_mission(self, mission_id):
             return self.missions.get(mission_id)
-
-        def unassign_mission(self, mission_id: str, reason: Optional[str] = None):
-            m = self.missions.get(mission_id)
-            if not m:
-                return
-            prev = m.get("assigned_rover")
-            m["assigned_rover"] = None
-            m["state"] = "CREATED"
-            m.setdefault("history", []).append({"ts": utils.now_iso(), "type": "ASSIGN_FAILED", "reason": reason})
-            if prev:
-                self.rovers.setdefault(prev, {})["state"] = "IDLE"
-
-        def cancel_mission(self, mission_id: str, reason: Optional[str] = None):
-            m = self.missions.get(mission_id)
-            if not m:
-                return
-            prev = m.get("assigned_rover")
-            m.setdefault("history", []).append({"ts": utils.now_iso(), "type": "CANCEL", "reason": reason})
-            m["state"] = "CANCELLED"
-            m["cancelled_at"] = utils.now_iso()
-            if prev:
-                self.rovers.setdefault(prev, {})["state"] = "IDLE"
-
-        def get_rover(self, rover_id: str):
-            return self.rovers.get(rover_id)
 
 
 class PendingOutgoing:
-    """
-    Representa uma mensagem enviada pelo servidor que aguarda ACK.
-
-    Guarda message_type e mission_id (quando disponíveis) para permitir
-    decisão de política quando retries esgotam.
-    """
-    def __init__(self, msg_id: str, packet: bytes, addr: Tuple[str, int], created_at: float, timeout_s: float,
-                 message_type: Optional[str] = None, mission_id: Optional[str] = None):
-        self.msg_id = msg_id
+    def __init__(
+        self,
+        msg_id: int,
+        packet: bytes,
+        addr: Tuple[str, int],
+        created_at: float,
+        timeout_s: float,
+        message_type: Optional[str] = None,
+        mission_id: Optional[str] = None,
+    ):
+        self.msg_id = int(msg_id)
         self.packet = packet
         self.addr = addr
         self.created_at = created_at
         self.next_timeout = created_at + timeout_s
         self.attempts = 0
         self.timeout_s = timeout_s
-        # additional metadata
         self.message_type = message_type
         self.mission_id = mission_id
+        self.metadata: Dict[str, Any] = {}
 
 
 class MLServerProtocol(asyncio.DatagramProtocol):
@@ -142,31 +99,18 @@ class MLServerProtocol(asyncio.DatagramProtocol):
         super().__init__()
         self.transport = None
         self.mission_store = mission_store
-
-        # Dedup cache: msg_id -> timestamp
-        self.seen_msgs: Dict[str, float] = {}
-
-        # Pending outgoing messages that require ACK: msg_id -> PendingOutgoing
-        self.pending_outgoing: Dict[str, PendingOutgoing] = {}
-
-        # Store last ACKs sent for duplicated handling (msg_id -> ack_packet)
-        self.last_acks: Dict[str, bytes] = {}
-
-        # Metrics
+        self.seen_msgs: Dict[int, float] = {}
+        self.pending_outgoing: Dict[int, PendingOutgoing] = {}
+        self.last_acks: Dict[int, bytes] = {}
         self.metrics = utils.metrics
-
-        # Async tasks
         self._task_retransmit = None
         self._task_cleanup = None
-
-        # RTT estimation (simple)
-        self.rtt_estimate = None
+        self._lock = threading.Lock()
 
     def connection_made(self, transport):
         self.transport = transport
         sockname = transport.get_extra_info("sockname")
-        logger.info(f"ML server listening on {sockname}")
-        # Start background tasks
+        logger.info("ML server listening on %s", sockname)
         loop = asyncio.get_event_loop()
         self._task_retransmit = loop.create_task(self._retransmit_loop())
         self._task_cleanup = loop.create_task(self._cleanup_loop())
@@ -179,256 +123,273 @@ class MLServerProtocol(asyncio.DatagramProtocol):
             self._task_cleanup.cancel()
 
     def datagram_received(self, data: bytes, addr):
-        # Entry point for incoming datagrams
         try:
-            envelope = ml_schema.parse_envelope(data)
+            parsed = binary_proto.parse_ml_datagram(data)
         except Exception as e:
-            logger.warning(f"Failed to parse envelope from {addr}: {e}")
-            # Optionally send ERROR back (can't rely on parse to get msg_id)
-            return
-
-        header = envelope["header"]
-        body = envelope["body"]
-        msg_id = header["msg_id"]
-        mtype = header["message_type"]
-        rover_id = header.get("rover_id")
-        logger.debug(f"Received {mtype} msg_id={msg_id} from {addr} rover_id={rover_id}")
-
-        # Dedup check
-        if msg_id in self.seen_msgs:
-            logger.debug(f"Duplicate msg {msg_id} from {addr} — resending ACK if known")
-            # If we have previously sent an ACK for this msg, re-send it
-            ack_packet = self.last_acks.get(msg_id)
-            if ack_packet:
-                self.transport.sendto(ack_packet, addr)
-            return
-        # mark seen
-        self.seen_msgs[msg_id] = time.time()
-
-        # Register rover if rover_id present
-        if rover_id:
+            logger.warning("Failed to parse ML datagram from %s: %s", addr, e)
+            # attempt to reply with an ERROR datagram
             try:
-                self.mission_store.register_rover(rover_id, addr)
+                err_tlv = (binary_proto.TLV_ERRORS, str(e).encode("utf-8"))
+                err_pkt = binary_proto.pack_ml_datagram(binary_proto.ML_ERROR, "", [err_tlv])
+                if self.transport:
+                    self.transport.sendto(err_pkt, addr)
             except Exception:
-                logger.exception("mission_store.register_rover failed (continuing)")
+                logger.exception("Failed to send ERROR datagram")
+            return
 
-        # Dispatch by message_type
+        header = parsed.get("header", {})
+        rover_id = parsed.get("rover_id", "")
+        tlvmap = parsed.get("tlvs", {})
+        canonical = binary_proto.tlv_to_canonical(tlvmap)
+        msgid = int(header.get("msgid") or 0)
+
+        # dedupe: if seen, resend last ack if available and skip processing
+        if msgid in self.seen_msgs:
+            last = self.last_acks.get(msgid)
+            if last and self.transport:
+                try:
+                    self.transport.sendto(last, addr)
+                except Exception:
+                    logger.exception("Failed to re-send last ACK for duplicate msg %s", msgid)
+            logger.debug("Duplicate ML msg %s from %s", msgid, addr)
+            return
+        self.seen_msgs[msgid] = time.time()
+
+        # register rover address if present
         try:
-            if mtype == "REQUEST_MISSION":
-                self._handle_request_mission(envelope, addr)
-            elif mtype == "PROGRESS":
-                self._handle_progress(envelope, addr)
-                # send ACK
-                ack_env = ml_schema.make_ack(msg_id, rover_id=rover_id, mission_id=header.get("mission_id"))
-                self._send_ack_immediate(ack_env, addr)
-            elif mtype == "MISSION_COMPLETE":
-                self._handle_complete(envelope, addr)
-                ack_env = ml_schema.make_ack(msg_id, rover_id=rover_id, mission_id=header.get("mission_id"))
-                self._send_ack_immediate(ack_env, addr)
-            elif mtype == "ACK":
-                # ACK for message we sent
-                acked = body.get("acked_msg_id")
-                if acked:
-                    self._handle_incoming_ack(acked, addr)
-            elif mtype == "ERROR":
-                logger.warning(f"Received ERROR from {rover_id}@{addr}: {body}")
-                # react if needed
-            elif mtype == "HEARTBEAT":
-                ack_env = ml_schema.make_ack(msg_id, rover_id=rover_id, mission_id=header.get("mission_id"))
-                self._send_ack_immediate(ack_env, addr)
+            if rover_id:
+                try:
+                    # mission_store.register_rover might accept address dict or tuple
+                    self.mission_store.register_rover(rover_id, address={"ip": addr[0], "port": int(addr[1])})
+                except TypeError:
+                    try:
+                        self.mission_store.register_rover(rover_id, addr)
+                    except Exception:
+                        self.mission_store.register_rover(rover_id)
+        except Exception:
+            logger.exception("mission_store.register_rover failed (continuing)")
+
+        mtype = header.get("msgtype")
+        try:
+            if mtype == binary_proto.ML_REQUEST_MISSION:
+                self._handle_request_mission(rover_id, canonical, addr, msgid=msgid)
+
+            elif mtype == binary_proto.ML_PROGRESS:
+                self._handle_progress(rover_id, canonical, addr)
+                # ack progress
+                ack_pkt = binary_proto.pack_ml_datagram(
+                    binary_proto.ML_ACK,
+                    rover_id,
+                    [(binary_proto.TLV_ACKED_MSG_ID, struct.pack(">Q", msgid))],
+                    msgid=0,
+                )
+                if self.transport:
+                    self.transport.sendto(ack_pkt, addr)
+                    self.last_acks[msgid] = ack_pkt
+
+            elif mtype == binary_proto.ML_MISSION_COMPLETE:
+                self._handle_complete(rover_id, canonical, addr)
+                ack_pkt = binary_proto.pack_ml_datagram(
+                    binary_proto.ML_ACK,
+                    rover_id,
+                    [(binary_proto.TLV_ACKED_MSG_ID, struct.pack(">Q", msgid))],
+                    msgid=0,
+                )
+                if self.transport:
+                    self.transport.sendto(ack_pkt, addr)
+                    self.last_acks[msgid] = ack_pkt
+
+            elif mtype == binary_proto.ML_HEARTBEAT:
+                # respond to heartbeat with ACK that acknowledges the heartbeat msgid
+                try:
+                    ack_pkt = binary_proto.pack_ml_datagram(
+                        binary_proto.ML_ACK,
+                        rover_id,
+                        [(binary_proto.TLV_ACKED_MSG_ID, struct.pack(">Q", msgid))],
+                        msgid=0,
+                    )
+                    if self.transport:
+                        self.transport.sendto(ack_pkt, addr)
+                        self.last_acks[int(msgid)] = ack_pkt
+                        logger.debug("Sent heartbeat ACK for msgid=%s to %s", msgid, addr)
+                except Exception:
+                    logger.exception("Failed to send ACK for HEARTBEAT")
+
+            elif mtype == binary_proto.ML_ACK:
+                # incoming ACK: check TLV ACKED_MSG_ID
+                acked_bytes = tlvmap.get(binary_proto.TLV_ACKED_MSG_ID, [])
+                acked_id = None
+                if acked_bytes:
+                    try:
+                        acked_id = struct.unpack(">Q", acked_bytes[0])[0]
+                    except Exception:
+                        acked_id = None
+                if acked_id is not None:
+                    self._handle_incoming_ack(int(acked_id), addr)
+
+            elif mtype == binary_proto.ML_ERROR:
+                logger.warning("ML ERROR from %s@%s: %s", rover_id, addr, canonical.get("errors") or canonical)
+
             else:
-                logger.warning(f"Unhandled message_type: {mtype}")
-        except Exception as e:
-            logger.error(f"Error handling message {msg_id} from {addr}: {e}")
-            traceback.print_exc()
+                logger.warning("Unhandled ML msgtype %s from %s", mtype, addr)
 
-    # -------------------------
-    # Handlers for message types
-    # -------------------------
-    def _handle_request_mission(self, envelope: Dict[str, Any], addr):
-        header = envelope["header"]
-        body = envelope["body"]
-        rover_id = header.get("rover_id") or f"{addr}"
-        logger.info(f"Handling REQUEST_MISSION from {rover_id} ({addr})")
+        except Exception:
+            logger.exception("Error handling ML message")
 
-        # Simple policy: pick a pending mission from mission_store
+    # ----- handlers and helpers -------------------------------------------------
+    def _handle_request_mission(self, rover_id: str, canonical: Dict[str, Any], addr: Tuple[str, int], msgid: int = 0):
+        logger.info("Handling REQUEST_MISSION from %s (%s)", rover_id, addr)
         pending = self.mission_store.get_pending_mission_for_rover(rover_id)
         if pending is None:
-            err_body = {"code": "E-NO-MISSION", "description": "No mission available"}
-            err_env = ml_schema.build_envelope("ERROR", body=err_body, rover_id=rover_id)
-            self._send_with_reliability(err_env, addr)
+            err_tlv = (binary_proto.TLV_ERRORS, b"No mission available")
+            err_pkt = binary_proto.pack_ml_datagram(binary_proto.ML_ERROR, rover_id, [err_tlv])
+            if self.transport:
+                self.transport.sendto(err_pkt, addr)
             return
-
-        # Assign mission
         try:
             self.mission_store.assign_mission_to_rover(pending, rover_id)
         except Exception:
             logger.exception("Failed to assign mission in mission_store")
 
-        ui = pending.get("update_interval_s") or config.DEFAULT_UPDATE_INTERVAL_S
+        # build assign TLVs
+        tlvs = []
+        tlvs.append((binary_proto.TLV_MISSION_ID, pending["mission_id"].encode("utf-8")))
+        params = pending.get("params", {})
+        tlvs.append((binary_proto.TLV_PARAMS_JSON, json.dumps(params).encode("utf-8")))
 
-        assign_body = {
-            "mission_id": pending["mission_id"],
-            "area": pending.get("area"),
-            "task": pending.get("task"),
-            "params": pending.get("params", {}),
-            "max_duration_s": pending.get("max_duration_s"),
-            "update_interval_s": ui,
-            "priority": pending.get("priority", 1),
-        }
-        assign_env = ml_schema.build_envelope(
-            "MISSION_ASSIGN",
-            body=assign_body,
-            rover_id=rover_id,
-            mission_id=pending["mission_id"],
-            seq=0,
-        )
-        logger.info(f"Sending MISSION_ASSIGN {pending['mission_id']} to {rover_id}@{addr}")
-        self._send_with_reliability(assign_env, addr)
+        # numeric msgid for server->client message (uint64)
+        server_msgid = int(time.time() * 1000) & 0xFFFFFFFFFFFFFFFF
+        assign_pkt = binary_proto.pack_ml_datagram(binary_proto.ML_MISSION_ASSIGN, rover_id, tlvs, msgid=server_msgid)
 
-    def _handle_progress(self, envelope: Dict[str, Any], addr):
-        header = envelope["header"]
-        body = envelope["body"]
-        rover_id = header.get("rover_id") or str(addr)
-        mission_id = header.get("mission_id") or body.get("mission_id")
-        logger.info(f"Progress from {rover_id} on mission {mission_id}: {body.get('progress_pct')}")
+        # store pending for retransmit & track
+        self._send_with_reliability(assign_pkt, addr, message_type="MISSION_ASSIGN", mission_id=pending["mission_id"], msgid=server_msgid)
+
+    def _handle_progress(self, rover_id: str, canonical: Dict[str, Any], addr: Tuple[str, int]):
+        mission_id = canonical.get("mission_id")
+        logger.info("Progress from %s on mission %s: %s", rover_id, mission_id, canonical.get("progress_pct"))
         try:
             if mission_id:
-                self.mission_store.update_progress(mission_id, rover_id, body)
+                self.mission_store.update_progress(mission_id, rover_id, canonical)
         except Exception:
             logger.exception("mission_store.update_progress failed")
 
-    def _handle_complete(self, envelope: Dict[str, Any], addr):
-        header = envelope["header"]
-        body = envelope["body"]
-        rover_id = header.get("rover_id") or str(addr)
-        mission_id = header.get("mission_id") or body.get("mission_id")
-        logger.info(f"MISSION_COMPLETE from {rover_id} for mission {mission_id}: {body.get('result')}")
+    def _handle_complete(self, rover_id: str, canonical: Dict[str, Any], addr: Tuple[str, int]):
+        mission_id = canonical.get("mission_id")
+        logger.info("MISSION_COMPLETE from %s for mission %s", rover_id, mission_id)
         try:
             if mission_id:
-                self.mission_store.complete_mission(mission_id, rover_id, body)
+                self.mission_store.complete_mission(mission_id, rover_id, canonical)
         except Exception:
             logger.exception("mission_store.complete_mission failed")
 
-    # -------------------------
-    # Sending utilities
-    # -------------------------
-    def _send_ack_immediate(self, ack_env: Dict[str, Any], addr):
-        try:
-            packet = ml_schema.envelope_to_bytes(ack_env)
-            if self.transport:
-                self.transport.sendto(packet, addr)
-            acked = ack_env["body"].get("acked_msg_id")
-            if acked:
-                self.last_acks[acked] = packet
-            logger.debug(f"Sent immediate ACK for {acked} to {addr}")
-        except Exception as e:
-            logger.exception(f"Failed to send immediate ACK to {addr}: {e}")
-
-    def _send_with_reliability(self, env: Dict[str, Any], addr: Tuple[str, int]):
-        try:
-            packet = ml_schema.envelope_to_bytes(env)
-        except Exception as e:
-            logger.exception(f"Failed to serialize envelope for sending: {e}")
-            return
-
-        header = env["header"]
-        msg_id = header["msg_id"]
-        msg_type = header.get("message_type")
-        mission_id = header.get("mission_id")
-
-        now = time.time()
-        timeout = config.TIMEOUT_TX_INITIAL
-        po = PendingOutgoing(msg_id=msg_id, packet=packet, addr=addr, created_at=now, timeout_s=timeout,
-                             message_type=msg_type, mission_id=mission_id)
-        self.pending_outgoing[msg_id] = po
-
-        try:
-            if self.transport:
-                self.transport.sendto(packet, addr)
-            po.attempts += 1
-            logger.debug(f"Sent msg_id={msg_id} to {addr} (attempt {po.attempts})")
-            self.metrics.incr("messages_sent")
-        except Exception:
-            logger.exception(f"Failed to send packet to {addr}")
-
-    def send_mission_cancel(self, mission_id: str, reason: Optional[str] = None) -> Optional[str]:
+    def send_mission_cancel(self, mission_id: str, reason: Optional[str] = None) -> int:
         """
-        Request the assigned rover to cancel a mission by sending MISSION_CANCEL reliably.
-        Returns the msg_id of the pending cancel (if sent) or None if no assigned rover/address known.
+        Send a MISSION_CANCEL to the assigned rover for the given mission_id.
+        Returns the numeric msgid used for the outgoing cancel (key for pending_outgoing).
         """
         m = self.mission_store.get_mission(mission_id)
         if not m:
-            logger.warning(f"send_mission_cancel: unknown mission {mission_id}")
-            return None
-        assigned = m.get("assigned_rover")
-        if not assigned:
-            logger.info(f"send_mission_cancel: mission {mission_id} not assigned; marking cancelled locally")
-            try:
-                self.mission_store.cancel_mission(mission_id, reason=reason or "cancel_requested")
-            except Exception:
-                logger.exception("mission_store.cancel_mission failed")
-            return None
+            raise ValueError("Unknown mission_id")
+        rover_id = m.get("assigned_rover")
+        if not rover_id:
+            raise ValueError("Mission not assigned")
 
-        # find rover address (mission_store should have registered rover info)
-        rover_info = None
+        # Build TLVs: mission id and optional reason
+        tlvs = [(binary_proto.TLV_MISSION_ID, mission_id.encode("utf-8"))]
+        if reason:
+            tlvs.append((binary_proto.TLV_PARAMS_JSON, json.dumps({"reason": reason}).encode("utf-8")))
+
+        server_msgid = int(time.time() * 1000) & 0xFFFFFFFFFFFFFFFF
+        # Use existing ML_CANCEL constant from binary_proto (compatibility with binary_proto naming)
+        pkt = binary_proto.pack_ml_datagram(binary_proto.ML_CANCEL, rover_id, tlvs, msgid=server_msgid)
+
+        # find rover address if registered
+        addr = None
         try:
-            rover_info = self.mission_store.get_rover(assigned)
+            rinfo = None
+            if hasattr(self.mission_store, "get_rover"):
+                rinfo = self.mission_store.get_rover(rover_id)
+            if rinfo and isinstance(rinfo, dict) and "address" in rinfo and rinfo["address"]:
+                addr = (rinfo["address"].get("ip"), int(rinfo["address"].get("port")))
         except Exception:
-            logger.exception("mission_store.get_rover failed")
+            addr = None
 
-        if not rover_info:
-            logger.warning(f"send_mission_cancel: no rover info for {assigned}, marking cancelled locally")
+        if addr is None:
+            addr = (config.ML_HOST, config.ML_UDP_PORT)
+
+        # store pending and send
+        self._send_with_reliability(pkt, addr, message_type="MISSION_CANCEL", mission_id=mission_id, msgid=server_msgid)
+        return server_msgid
+
+    def _send_with_reliability(
+        self,
+        packet: bytes,
+        addr: Tuple[str, int],
+        message_type: str = None,
+        mission_id: Optional[str] = None,
+        msgid: Optional[int] = None,
+    ):
+        # respect datagram size limit
+        if len(packet) > getattr(config, "ML_MAX_DATAGRAM_SIZE", 1200):
+            logger.error("Attempt to send oversized ML datagram (%d bytes) to %s; dropping", len(packet), addr)
+            return
+
+        if msgid is None:
             try:
-                self.mission_store.cancel_mission(mission_id, reason=reason or "cancel_requested")
+                hdr = binary_proto.unpack_ml_header(packet)
+                msgid = int(hdr.get("msgid", int(time.time() * 1000)))
             except Exception:
-                logger.exception("mission_store.cancel_mission failed")
-            return None
+                msgid = int(time.time() * 1000)
 
-        addr = (rover_info.get("address", {}).get("ip"), int(rover_info.get("address", {}).get("port")))
-        if not addr or not addr[0]:
-            logger.warning(f"send_mission_cancel: invalid address for rover {assigned}: {rover_info.get('address')}")
-            try:
-                self.mission_store.cancel_mission(mission_id, reason=reason or "cancel_requested")
-            except Exception:
-                logger.exception("mission_store.cancel_mission failed")
-            return None
+        now = time.time()
+        timeout = config.TIMEOUT_TX_INITIAL
+        po = PendingOutgoing(msg_id=msgid, packet=packet, addr=addr, created_at=now, timeout_s=timeout, message_type=message_type, mission_id=mission_id)
+        po.attempts = 1
+        po.next_timeout = now + timeout
+        with self._lock:
+            self.pending_outgoing[int(msgid)] = po
+        try:
+            if self.transport:
+                self.transport.sendto(packet, addr)
+                logger.debug("Sent %s msgid=%s to %s", message_type, msgid, addr)
+                self.metrics.incr("messages_sent")
+        except Exception:
+            logger.exception("Failed to send packet to %s", addr)
 
-        body = {"mission_id": mission_id, "reason": reason}
-        env = ml_schema.build_envelope("MISSION_CANCEL", body=body, rover_id=None, mission_id=mission_id)
-        logger.info(f"Sending MISSION_CANCEL for {mission_id} to {assigned}@{addr}")
-        self._send_with_reliability(env, addr)
-        return env["header"]["msg_id"]
-
-    def _handle_incoming_ack(self, acked_msg_id: str, addr):
-        """
-        Trata ACK recebido pelo servidor, removendo pending_outgoing e registando métricas.
-        Também aplica ações específicas quando o ACK confirma um MISSION_CANCEL.
-        """
-        po = self.pending_outgoing.pop(acked_msg_id, None)
+    def _handle_incoming_ack(self, acked_msg_id: int, addr):
+        with self._lock:
+            po = self.pending_outgoing.pop(int(acked_msg_id), None)
         if po:
-            elapsed = time.time() - po.created_at
-            logger.info(f"Received ACK for {acked_msg_id} from {addr} (attempts={po.attempts} elapsed={elapsed:.2f}s)")
+            logger.info("Received ACK for outgoing msg %s from %s (type=%s)", acked_msg_id, addr, po.message_type)
             self.metrics.incr("acks_received")
-            # if this ACK acknowledges a cancel we sent, mark mission cancelled in mission_store
+            # If this ACK confirms a cancel, instruct mission_store to mark the mission cancelled
             try:
                 if po.message_type == "MISSION_CANCEL" and po.mission_id:
-                    try:
-                        self.mission_store.cancel_mission(po.mission_id, reason="cancel_ack_received")
-                        logger.info(f"Mission {po.mission_id} marked CANCELLED after ACK from {addr}")
-                    except Exception:
-                        logger.exception("mission_store.cancel_mission failed on cancel ACK")
+                    if hasattr(self.mission_store, "cancel_mission"):
+                        self.mission_store.cancel_mission(po.mission_id, reason=po.metadata.get("reason") if po.metadata else None)
+                    else:
+                        # fallback: try to set state/history manually
+                        try:
+                            m = self.mission_store.get_mission(po.mission_id)
+                            if m is not None:
+                                m["state"] = "CANCELLED"
+                                m.setdefault("history", []).append({"ts": utils.now_iso(), "type": "CANCEL"})
+                                m["assigned_rover"] = None
+                        except Exception:
+                            logger.exception("Fallback cancel handling failed")
             except Exception:
-                logger.exception("Error handling special ACK case")
+                logger.exception("Failed to apply cancel action in mission_store for %s", po.mission_id)
         else:
-            logger.debug(f"Received ACK for unknown or already-handled msg {acked_msg_id}")
+            logger.debug("Received ACK for unknown/out-of-window msg %s from %s", acked_msg_id, addr)
 
     async def _retransmit_loop(self):
         try:
             while True:
                 now = time.time()
                 to_remove = []
-                for msg_id, po in list(self.pending_outgoing.items()):
+                with self._lock:
+                    items = list(self.pending_outgoing.items())
+                for msg_id, po in items:
                     if now >= po.next_timeout:
                         if po.attempts <= config.N_RETX:
                             try:
@@ -436,47 +397,35 @@ class MLServerProtocol(asyncio.DatagramProtocol):
                                     self.transport.sendto(po.packet, po.addr)
                                 po.attempts += 1
                                 po.next_timeout = now + (po.timeout_s * (config.BACKOFF_FACTOR ** (po.attempts - 1)))
-                                logger.warning(f"Retransmit msg {msg_id} to {po.addr} attempt={po.attempts}")
+                                logger.warning("Retransmit msg %s to %s attempt=%d", msg_id, po.addr, po.attempts)
                                 self.metrics.incr("retransmits")
                             except Exception:
-                                logger.exception(f"Failed retransmit for {msg_id}")
+                                logger.exception("Failed retransmit for %s", msg_id)
                         else:
-                            logger.error(f"Retries exhausted for msg {msg_id} to {po.addr} (type={po.message_type})")
+                            logger.error("Retries exhausted for msg %s to %s (type=%s)", msg_id, po.addr, po.message_type)
                             try:
                                 if po.message_type == "MISSION_ASSIGN" and po.mission_id:
                                     if hasattr(self.mission_store, "unassign_mission"):
                                         self.mission_store.unassign_mission(po.mission_id, reason="undeliverable_assign")
-                                        logger.info(f"Reverted assignment of mission {po.mission_id} after undeliverable ASSIGN to {po.addr}")
-                                    else:
-                                        lock = getattr(self.mission_store, "_lock", contextlib.nullcontext())
-                                        with lock:
-                                            m = getattr(self.mission_store, "_missions", {}).get(po.mission_id)
-                                            if m:
-                                                prev = m.get("assigned_rover")
-                                                m["assigned_rover"] = None
-                                                m["state"] = "CREATED"
-                                                m.setdefault("history", []).append({"ts": utils.now_iso(), "type": "ASSIGN_FAILED", "reason": "undeliverable_assign"})
-                                                if prev:
-                                                    getattr(self.mission_store, "_rovers", {}).setdefault(prev, {})["state"] = "IDLE"
-                                        try:
-                                            if hasattr(self.mission_store, "_emit"):
-                                                self.mission_store._emit("mission_assign_failed", {"mission_id": po.mission_id, "reason": "undeliverable_assign"})
-                                        except Exception:
-                                            pass
-                                        logger.info(f"Reverted assignment (fallback) of mission {po.mission_id}")
+                                        logger.info("Reverted assignment of mission %s after undeliverable ASSIGN to %s", po.mission_id, po.addr)
                                     self.metrics.incr("assign_failures")
-                                else:
+                                elif po.message_type == "MISSION_CANCEL" and po.mission_id:
                                     try:
-                                        if hasattr(self.mission_store, "_emit"):
-                                            self.mission_store._emit("outgoing_failed", {"msg_id": msg_id, "addr": po.addr, "message_type": po.message_type})
+                                        m = self.mission_store.get_mission(po.mission_id)
+                                        if m is not None:
+                                            m.setdefault("history", []).append({"ts": utils.now_iso(), "type": "CANCEL_FAILED", "reason": "undeliverable_cancel"})
+                                            logger.info("Cancel failed for mission %s after undeliverable CANCEL to %s", po.mission_id, po.addr)
+                                        self.metrics.incr("cancel_failures")
                                     except Exception:
-                                        logger.exception("Failed to emit outgoing_failed")
+                                        logger.exception("Error handling exhausted cancel")
+                                else:
                                     self.metrics.incr("outgoing_failures")
                             except Exception:
                                 logger.exception("Error in exhausted-retry policy handler")
                             to_remove.append(msg_id)
-                for mid in to_remove:
-                    self.pending_outgoing.pop(mid, None)
+                with self._lock:
+                    for mid in to_remove:
+                        self.pending_outgoing.pop(mid, None)
                 await asyncio.sleep(0.5)
         except asyncio.CancelledError:
             logger.info("_retransmit_loop cancelled")
@@ -498,117 +447,3 @@ class MLServerProtocol(asyncio.DatagramProtocol):
         except Exception:
             logger.exception("Error in _cleanup_loop")
             raise
-
-
-# -------------------------
-# Entrypoint
-# -------------------------
-def run_server(listen_host: str = "0.0.0.0", listen_port: int = None, persist_file: Optional[str] = None, enable_telemetry: bool = False):
-    """
-    Start the ML UDP server.
-    - If persist_file is provided, pass it to MissionStore; else read ML_MISSION_STORE_FILE env var.
-    - If still None, no persistence is used.
-    - If enable_telemetry is True, start TelemetryServer/TelemetryStore via nave_mae.startup.start_services
-      so TelemetryServer can share the same MissionStore and be stopped cleanly on shutdown.
-    """
-    # Determine persist_file: argument > env var > default data/mission_store.json (if data/ exists)
-    pf = persist_file or os.getenv("ML_MISSION_STORE_FILE")
-    if pf is None:
-        # default to data/mission_store.json in repo root if directory exists or can be created
-        default_dir = os.path.join(os.getcwd(), "data")
-        try:
-            os.makedirs(default_dir, exist_ok=True)
-            pf = os.path.join(default_dir, "mission_store.json")
-        except Exception:
-            pf = None
-
-    if listen_port is None:
-        listen_port = config.ML_UDP_PORT
-
-    # Create a fresh event loop for this thread and set it as the current loop.
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-
-    telemetry_server = None
-    telemetry_ts = None
-
-    # If telemetry integration requested, start services (which will create ms/ts and telemetry_server)
-    if enable_telemetry:
-        try:
-            # lazy import
-            from nave_mae.startup import start_services
-            telemetry_host = getattr(config, "TELEMETRY_HOST", "127.0.0.1")
-            telemetry_port = getattr(config, "TELEMETRY_PORT", 65080)
-            services = loop.run_until_complete(
-                start_services(host=telemetry_host, telemetry_port=telemetry_port, start_ml_server=False, ml_host=listen_host, ml_port=listen_port, persist_file=pf,)
-            )
-            ms = services.get("ms")
-            telemetry_server = services.get("telemetry_server")
-            telemetry_ts = services.get("ts")
-            logger.info("Telemetry integration enabled; telemetry server started on %s:%s", telemetry_host, telemetry_port)
-        except Exception:
-            logger.exception("Failed to start telemetry services; falling back to local MissionStore")
-            ms = MissionStore(persist_file=pf) if pf else MissionStore()
-    else:
-        # No telemetry integration requested: create plain MissionStore (pass persist_file if supported)
-        ms = MissionStore(persist_file=pf) if pf else MissionStore()
-
-    proto = MLServerProtocol(ms)
-
-    try:
-        listen = loop.create_datagram_endpoint(lambda: proto, local_addr=(listen_host, listen_port))
-        transport, _ = loop.run_until_complete(listen)
-        logger.info(f"Server starting (persist_file={pf})")
-        loop.run_forever()
-    except KeyboardInterrupt:
-        logger.info("Shutting down ML server (KeyboardInterrupt)")
-    finally:
-        # tidy up transport and tasks
-        try:
-            transport.close()
-        except Exception:
-            pass
-        if proto._task_retransmit:
-            proto._task_retransmit.cancel()
-        if proto._task_cleanup:
-            proto._task_cleanup.cancel()
-        # give loop a moment to cancel tasks
-        try:
-            loop.run_until_complete(asyncio.sleep(0.1))
-        except Exception:
-            pass
-
-        # Stop telemetry server if it was started via start_services
-        if telemetry_server:
-            try:
-                loop.run_until_complete(telemetry_server.stop())
-                logger.info("Telemetry server stopped cleanly")
-            except Exception:
-                logger.exception("Failed to stop telemetry server cleanly")
-
-        loop.close()
-
-
-if __name__ == "__main__":
-    # Configure logging so TelemetryServer logs are visible when running as a script
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s [%(name)s] %(message)s")
-
-    parser = argparse.ArgumentParser(description="MissionLink ML server (Nave-Mãe)")
-    parser.add_argument("--host", default="0.0.0.0", help="Host/interface to bind")
-    parser.add_argument("--port", type=int, default=None, help="UDP port to bind (overrides ML_UDP_PORT)")
-    parser.add_argument("--persist-file", default=None, help="Path to mission_store persist file (overrides ML_MISSION_STORE_FILE)")
-    parser.add_argument("--enable-telemetry", action="store_true", help="Also start the TelemetryServer and TelemetryStore in the same process")
-    args = parser.parse_args()
-
-    # If user passed --persist-file as a directory ensure directory exists
-    if args.persist_file:
-        try:
-            d = os.path.dirname(args.persist_file) or "."
-            os.makedirs(d, exist_ok=True)
-        except Exception:
-            logger.exception("Failed to create directory for persist-file")
-
-    try:
-        run_server(listen_host=args.host, listen_port=args.port, persist_file=args.persist_file, enable_telemetry=args.enable_telemetry)
-    except Exception:
-        traceback.print_exc()
