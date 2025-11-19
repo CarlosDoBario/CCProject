@@ -7,9 +7,9 @@ faz snapshot do TelemetryStore e imprime o estado do MissionStore para valida√ß√
 
 Uso:
   PowerShell:
-    $env:PYTHONPATH="src"; python .\verify_telemetry.py
+    $env:PYTHONPATH="src"; python .\src\scripts\verify_telemetry.py
   Bash:
-    PYTHONPATH=src python verify_telemetry.py
+    PYTHONPATH=src python src/scripts/verify_telemetry.py
 """
 import asyncio
 import logging
@@ -18,7 +18,8 @@ from nave_mae.telemetry_launcher import start_telemetry_server
 
 logging.basicConfig(level=logging.INFO)
 
-async def main():
+
+async def _run():
     # Start telemetry server in-process (standalone mode)
     services = await start_telemetry_server(mission_store=None, telemetry_store=None, host="127.0.0.1", port=65080, persist_file=None)
     ms = services["ms"]
@@ -26,15 +27,21 @@ async def main():
     server = services["telemetry_server"]
     print("Telemetry server started in-process")
 
-    # Run a client that sends a single telemetry packet
-    client = TelemetryClient(rover_id="R-VERIFY", host="127.0.0.1", port=65080, interval_s=0.01, hello_first=True, use_sim=False)
+    # Run a client that sends a single telemetry packet using the TelemetryClient.run_once API
+    client = TelemetryClient(rover_id="R-VERIFY", host="127.0.0.1", port=65080, interval_s=0.0, reconnect=False)
+    # call run_once to connect, send one telemetry sample and disconnect
     await client.run_once()
+
     # allow small time for server to process hooks
     await asyncio.sleep(0.2)
 
-    # Inspect telemetry store and mission store
-    snap = await ts.snapshot()
-    print("TelemetryStore snapshot keys:", list(snap.keys()))
+    # Inspect telemetry store snapshot (TelemetryStore.snapshot returns dict)
+    try:
+        snap = ts.snapshot()
+        print("TelemetryStore snapshot keys:", list(snap.keys()))
+    except Exception as e:
+        print("Failed to snapshot TelemetryStore:", e)
+
     try:
         # MissionStore API may vary; try common methods
         if hasattr(ms, "list_rovers"):
@@ -51,5 +58,6 @@ async def main():
     await server.stop()
     print("Telemetry server stopped")
 
+
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(_run())

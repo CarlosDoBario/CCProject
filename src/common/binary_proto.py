@@ -185,6 +185,10 @@ def pack_ts_message(msgtype: int, rover_id: str, tlv_items: List[Tuple[int, byte
       4-byte BE length | payload
     Payload = header + roverid + tlvs [+ crc32 if include_crc or flags has CRC bit]
     """
+    # Ensure header flags reflect include_crc request
+    if include_crc:
+        flags = flags | FLAG_CRC32
+
     header = pack_ts_header(msgtype, flags, msgid=msgid, timestamp_ms=timestamp_ms)
     rid_b = rover_id.encode("utf-8")
     if len(rid_b) > 255:
@@ -335,7 +339,14 @@ def tlv_to_canonical(tlv_map: Dict[int, List[bytes]]) -> Dict[str, Any]:
     elif TLV_PAYLOAD_JSON in tlv_map:
         try:
             import json
-            out.update(json.loads(tlv_map[TLV_PAYLOAD_JSON][0].decode("utf-8")))
+            # Try to decode JSON payload into fields; if it's a dict merge into out
+            parsed = json.loads(tlv_map[TLV_PAYLOAD_JSON][0].decode("utf-8"))
+            if isinstance(parsed, dict):
+                out.update(parsed)
+                # also keep a copy under payload_json for completeness
+                out.setdefault("payload_json", parsed)
+            else:
+                out["payload_json"] = parsed
         except Exception:
             # ignore parse errors, keep raw
             out["payload_json"] = tlv_map[TLV_PAYLOAD_JSON][0].decode("utf-8")
