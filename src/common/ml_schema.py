@@ -22,7 +22,6 @@ Notes:
 - This module maps high-level fields in the legacy JSON envelope to TLVs.
 - For mission_spec heavy payloads we prefer PARAMS_JSON TLV (JSON encoded string).
 """
-
 from __future__ import annotations
 
 import json
@@ -222,9 +221,13 @@ def envelope_to_bytes(envelope: Dict[str, Any]) -> bytes:
         desc = body.get("description") or body.get("error") or str(body)
         tlvs.append((binary_proto.TLV_ERRORS, str(desc).encode("utf-8")))
     elif mtype == "HEARTBEAT":
-        # optional nonce
+        # HEARTBEAT may carry an optional nonce/diagnostic; put it in PAYLOAD_JSON for clarity
         if body.get("nonce"):
-            tlvs.append((binary_proto.TLV_ERRORS, str(body.get("nonce")).encode("utf-8")))
+            try:
+                # If nonce is a JSON-serializable object, encode as JSON; else stringify
+                tlvs.append((binary_proto.TLV_PAYLOAD_JSON, json.dumps(body.get("nonce")).encode("utf-8")))
+            except Exception:
+                tlvs.append((binary_proto.TLV_PAYLOAD_JSON, str(body.get("nonce")).encode("utf-8")))
 
     # Build datagram: use flags (ack requested?) from body['flags'] if present
     flags = 0

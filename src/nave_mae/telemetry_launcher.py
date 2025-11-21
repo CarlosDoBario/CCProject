@@ -3,15 +3,18 @@
 telemetry_launcher.py
 
 Small helper library to start a TelemetryServer (TelemetryStream) for the
-Nave-Mãe. Updated to work with the binary TelemetryServer/TelemetryStore and
-the canonical telemetry payloads produced by common.binary_proto.
+Nave-Mãe.
 
 Behaviour:
  - creates MissionStore and TelemetryStore when not provided
  - registers telemetry -> mission hooks via nave_mae.telemetry_hooks.register_telemetry_hooks
  - starts TelemetryServer and returns handles for tests/cleanup
-"""
 
+Enhancement:
+ - Optional TelemetryPersister integration: if `persist_dir` is provided, a
+   TelemetryPersister is started and attached to the TelemetryStore. The returned
+   dict includes the persister instance and a detach callable to allow cleanup.
+"""
 from __future__ import annotations
 
 import asyncio
@@ -29,6 +32,7 @@ async def start_telemetry_server(
     host: str = "127.0.0.1",
     port: int = 65080,
     persist_file: Optional[str] = None,
+    persist_dir: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Create (or use provided) MissionStore and TelemetryStore, register hooks and start a TelemetryServer.
@@ -37,6 +41,11 @@ async def start_telemetry_server(
       - "ms": the MissionStore instance used
       - "ts": the TelemetryStore instance used
       - "telemetry_server": the running TelemetryServer instance
+      - "persister": TelemetryPersister instance if started (else None)
+      - "persister_detach": callable to detach persister from store (or None)
+
+    If persist_dir is provided, a TelemetryPersister is created, started and
+    attached to the telemetry_store so telemetry is persisted as NDJSON lines.
     """
     # Lazy imports to avoid circular imports on module import
     try:
@@ -46,6 +55,16 @@ async def start_telemetry_server(
     except Exception:
         _logger.exception("Telemetry modules could not be imported (are files present?)")
         raise
+
+    # Try to import persister if requested
+    persister = None
+    persister_detach = None
+    if persist_dir is not None:
+        try:
+            from nave_mae.telemetry_persister import TelemetryPersister  # type: ignore
+        except Exception:
+            _logger.exception("TelemetryPersister module not available; persist_dir ignored")
+            persist_dir = None
 
     # Ensure mission_store exists (standalone mode)
     if mission_store is None:
@@ -120,10 +139,31 @@ async def start_telemetry_server(
     else:
         _logger.warning("Could not attach telemetry -> MissionStore hook automatically; telemetry events may not update MissionStore")
 
-    return {"ms": mission_store, "ts": telemetry_store, "telemetry_server": server}
+    # Start TelemetryPersister if requested
+    if persist_dir is not None:
+        try:
+            persister = TelemetryPersister(outdir=persist_dir, prefix="telemetry")
+            persister.start()
+            try:
+                persister_detach = persister.attach_to_store(telemetry_store)
+                _logger.info("TelemetryPersister started and attached to TelemetryStore (outdir=%s)", persist_dir)
+            except Exception:
+                _logger.exception("TelemetryPersister.start succeeded but attach_to_store failed; stopping persister")
+                try:
+                    persister.stop()
+                except Exception:
+                    pass
+                persister = None
+                persister_detach = None
+        except Exception:
+            _logger.exception("Failed to start TelemetryPersister; continuing without persistence")
+            persister = None
+            persister_detach = None
+
+    return {"ms": mission_store, "ts": telemetry_store, "telemetry_server": server, "persister": persister, "persister_detach": persister_detach}
 
 
-def run_server_forever(host: str = "127.0.0.1", port: int = 65080, persist_file: Optional[str] = None) -> None:
+def run_server_forever(host: str = "127.0.0.1", port: int = 65080, persist_file: Optional[str] = None, persist_dir: Optional[str] = None) -> None:
     """
     CLI helper to run TelemetryServer standalone (creates its own MissionStore and TelemetryStore).
     Blocks until Ctrl-C.
@@ -138,7 +178,7 @@ def run_server_forever(host: str = "127.0.0.1", port: int = 65080, persist_file:
     asyncio.set_event_loop(loop)
     services = {}
     try:
-        services = loop.run_until_complete(start_telemetry_server(host=host, port=port, persist_file=persist_file))
+        services = loop.run_until_complete(start_telemetry_server(host=host, port=port, persist_file=persist_file, persist_dir=persist_dir))
         _logger.info("Telemetry server started; press Ctrl-C to stop")
         loop.run_forever()
     except KeyboardInterrupt:
@@ -149,7 +189,17 @@ def run_server_forever(host: str = "127.0.0.1", port: int = 65080, persist_file:
             if server:
                 loop.run_until_complete(server.stop())
         except Exception:
-            _logger.exception("Error stopping telemetry server")
+            _logger.exception("Error stopping TelemetryServer")
+        try:
+            # If a persister was started, stop it
+            persister = services.get("persister")
+            if persister:
+                try:
+                    persister.stop(wait=True, timeout=2.0)
+                except Exception:
+                    pass
+        except Exception:
+            pass
         try:
             loop.run_until_complete(loop.shutdown_asyncgens())
         except Exception:
@@ -163,5 +213,6 @@ if __name__ == "__main__":
     parser.add_argument("--host", default="127.0.0.1", help="Host to bind telemetry server")
     parser.add_argument("--port", type=int, default=config.TELEMETRY_PORT, help="Telemetry server port")
     parser.add_argument("--persist-file", default=None, help="Optional persist file to pass to MissionStore (standalone)")
+    parser.add_argument("--persist-dir", default=None, help="Optional directory to persist telemetry NDJSON (background persister)")
     args = parser.parse_args()
-    run_server_forever(host=args.host, port=args.port, persist_file=args.persist_file)
+    run_server_forever(host=args.host, port=args.port, persist_file=args.persist_file, persist_dir=args.persist_dir)

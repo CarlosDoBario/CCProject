@@ -310,71 +310,185 @@ def tlv_to_canonical(tlv_map: Dict[int, List[bytes]]) -> Dict[str, Any]:
     """
     Convert TLV map into a canonical python dict for MissionStore/TelemetryStore consumption.
     Priority: use typed TLVs. If complex fields required, fallback to PAYLOAD_JSON TLV (0x09).
+
+    Behavior:
+      - Typed TLVs (position, battery, progress, status, motion, temperature) take precedence.
+      - PAYLOAD_JSON and PARAMS_JSON are parsed if possible; dicts are merged into the result
+        but do NOT override already-populated typed fields.
+      - Multiple TLV_ERRORS entries produce a list of error strings/objects.
+      - TLV_ACKED_MSG_ID is exposed as numeric _acked_msg_id when present (useful for ACK handling).
+      - TLV_CAPABILITIES is parsed into a list of capability strings.
     """
     out: Dict[str, Any] = {}
+
+    def _safe_json_load(b: bytes) -> Any:
+        try:
+            import json
+            return json.loads(b.decode("utf-8"))
+        except Exception:
+            return None
+
     # mission id
     if TLV_MISSION_ID in tlv_map:
-        out["mission_id"] = tlv_map[TLV_MISSION_ID][0].decode("utf-8")
-    # position
+        try:
+            out["mission_id"] = tlv_map[TLV_MISSION_ID][0].decode("utf-8")
+        except Exception:
+            out["mission_id"] = tlv_map[TLV_MISSION_ID][0].decode("latin-1", errors="ignore")
+
+    # position (first occurrence)
     if TLV_POSITION in tlv_map:
         v = tlv_map[TLV_POSITION][0]
         if len(v) >= 12:
-            x, y, z = struct.unpack(">fff", v[:12])
-            out["position"] = {"x": float(x), "y": float(y), "z": float(z)}
+            try:
+                x, y, z = struct.unpack(">fff", v[:12])
+                out["position"] = {"x": float(x), "y": float(y), "z": float(z)}
+            except Exception:
+                pass
+
     # battery
     if TLV_BATTERY in tlv_map:
         v = tlv_map[TLV_BATTERY][0]
-        if len(v) >= 1:
-            level = v[0]
-            out["battery_level_pct"] = float(level)
-            if len(v) >= 5:
-                voltage = struct.unpack(">f", v[1:5])[0]
-                out["battery_voltage_v"] = float(voltage)
+        try:
+            if len(v) >= 1:
+                level = v[0]
+                out["battery_level_pct"] = float(level)
+                if len(v) >= 5:
+                    voltage = struct.unpack(">f", v[1:5])[0]
+                    out["battery_voltage_v"] = float(voltage)
+        except Exception:
+            pass
+
     # temperature
     if TLV_TEMPERATURE in tlv_map:
         v = tlv_map[TLV_TEMPERATURE][0]
-        out["temperature_c"] = struct.unpack(">f", v)[0]
+        try:
+            out["temperature_c"] = struct.unpack(">f", v)[0]
+        except Exception:
+            pass
+
     # motion
     if TLV_MOTION in tlv_map:
         v = tlv_map[TLV_MOTION][0]
-        speed, heading = struct.unpack(">ff", v[:8])
-        out["motion"] = {"speed_m_s": float(speed), "heading_deg": float(heading)}
+        try:
+            speed, heading = struct.unpack(">ff", v[:8])
+            out["motion"] = {"speed_m_s": float(speed), "heading_deg": float(heading)}
+        except Exception:
+            pass
+
     # progress
     if TLV_PROGRESS in tlv_map:
-        out["progress_pct"] = float(struct.unpack(">f", tlv_map[TLV_PROGRESS][0])[0])
+        try:
+            out["progress_pct"] = float(struct.unpack(">f", tlv_map[TLV_PROGRESS][0])[0])
+        except Exception:
+            pass
+
     # status
     if TLV_STATUS in tlv_map:
-        code = tlv_map[TLV_STATUS][0][0]
-        out["status"] = STATUS_ENUM.get(code, "UNKNOWN")
-    # errors / payload json fallback
-    if TLV_ERRORS in tlv_map:
-        out["errors"] = [tlv_map[TLV_ERRORS][0].decode("utf-8")]
-    elif TLV_PAYLOAD_JSON in tlv_map:
         try:
-            import json
-            # Try to decode JSON payload into fields; if it's a dict merge into out
-            parsed = json.loads(tlv_map[TLV_PAYLOAD_JSON][0].decode("utf-8"))
-            if isinstance(parsed, dict):
-                out.update(parsed)
-                # also keep a copy under payload_json for completeness
-                out.setdefault("payload_json", parsed)
-            else:
-                out["payload_json"] = parsed
+            code = tlv_map[TLV_STATUS][0][0]
+            out["status"] = STATUS_ENUM.get(code, "UNKNOWN")
         except Exception:
-            # ignore parse errors, keep raw
-            out["payload_json"] = tlv_map[TLV_PAYLOAD_JSON][0].decode("utf-8")
-    # mission spec / params
+            pass
+
+    # errors: can be multiple TLV_ERRORS entries; try JSON decode else string
+    if TLV_ERRORS in tlv_map:
+        errs = []
+        for b in tlv_map[TLV_ERRORS]:
+            try:
+                s = b.decode("utf-8")
+                # attempt to parse JSON if it looks like JSON
+                if s and (s.strip().startswith("{") or s.strip().startswith("[")):
+                    parsed = _safe_json_load(b)
+                    if parsed is not None:
+                        errs.append(parsed)
+                        continue
+                errs.append(s)
+            except Exception:
+                try:
+                    errs.append(b.decode("latin-1", errors="ignore"))
+                except Exception:
+                    errs.append(str(b))
+        out["errors"] = errs
+
+    # capabilities: may be one TLV with CSV or multiple entries
+    if TLV_CAPABILITIES in tlv_map:
+        caps = []
+        for b in tlv_map[TLV_CAPABILITIES]:
+            try:
+                s = b.decode("utf-8")
+            except Exception:
+                s = b.decode("latin-1", errors="ignore")
+            if s:
+                if "," in s:
+                    caps.extend([p.strip() for p in s.split(",") if p.strip()])
+                else:
+                    caps.append(s.strip())
+        if caps:
+            # dedupe while preserving order
+            seen = set()
+            caps_filtered = []
+            for c in caps:
+                if c not in seen:
+                    seen.add(c)
+                    caps_filtered.append(c)
+            out["capabilities"] = caps_filtered
+
+    # TLV_ACKED_MSG_ID: expose numeric ack id for canonical representation of ACK frames
+    if TLV_ACKED_MSG_ID in tlv_map:
+        try:
+            b = tlv_map[TLV_ACKED_MSG_ID][0]
+            # allow short representations by right-justifying
+            acked_id = int.from_bytes(b.rjust(8, b'\x00'), "big")
+            out["_acked_msg_id"] = acked_id
+        except Exception:
+            pass
+
+    # params JSON (mission params or telemetry params)
     if TLV_PARAMS_JSON in tlv_map:
         try:
-            import json
-            out["params"] = json.loads(tlv_map[TLV_PARAMS_JSON][0].decode("utf-8"))
+            parsed = _safe_json_load(tlv_map[TLV_PARAMS_JSON][0])
+            if parsed is not None:
+                out["params"] = parsed
+            else:
+                out["params_json"] = tlv_map[TLV_PARAMS_JSON][0].decode("utf-8", errors="replace")
         except Exception:
-            out["params_json"] = tlv_map[TLV_PARAMS_JSON][0].decode("utf-8")
+            out["params_json"] = tlv_map[TLV_PARAMS_JSON][0].decode("utf-8", errors="replace")
+
+    # mission spec (string blob or JSON)
     if TLV_MISSION_SPEC in tlv_map:
-        out["mission_spec"] = tlv_map[TLV_MISSION_SPEC][0].decode("utf-8")
-    # capabilities
-    if TLV_CAPABILITIES in tlv_map:
-        out["capabilities"] = tlv_map[TLV_CAPABILITIES][0].decode("utf-8").split(",")
+        try:
+            mspec_b = tlv_map[TLV_MISSION_SPEC][0]
+            parsed = _safe_json_load(mspec_b)
+            if isinstance(parsed, dict):
+                out["mission_spec"] = parsed
+            else:
+                out["mission_spec"] = mspec_b.decode("utf-8", errors="ignore")
+        except Exception:
+            out["mission_spec"] = tlv_map[TLV_MISSION_SPEC][0].decode("utf-8", errors="ignore")
+
+    # payload JSON fallback: combine occurrences. Merge dicts into out for convenience,
+    # but do not override already-set typed fields (typed take precedence).
+    if TLV_PAYLOAD_JSON in tlv_map:
+        payload_vals = []
+        for b in tlv_map[TLV_PAYLOAD_JSON]:
+            parsed = _safe_json_load(b)
+            if parsed is None:
+                # keep raw string as fallback
+                try:
+                    s = b.decode("utf-8")
+                except Exception:
+                    s = b.decode("latin-1", errors="ignore")
+                payload_vals.append(s)
+            else:
+                payload_vals.append(parsed)
+                # If parsed is a dict, merge unknown keys (do not override typed keys)
+                if isinstance(parsed, dict):
+                    for k, v in parsed.items():
+                        if k not in out:
+                            out[k] = v
+        # store the raw/parsed payloads in payload_json for completeness
+        out.setdefault("payload_json", payload_vals[0] if len(payload_vals) == 1 else payload_vals)
+
     return out
 
 
