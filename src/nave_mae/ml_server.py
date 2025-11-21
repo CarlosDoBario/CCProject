@@ -7,8 +7,10 @@ This module implements a DatagramProtocol-based ML server with:
 - reliable send with pending_outgoing & retransmit/backoff
 - ACK handling and deduplication
 - helpers for sending mission_cancel and handling its ACK
-"""
 
+Added: async stop() and stop_sync() methods to allow graceful shutdown/cleanup
+of running retransmit/cleanup tasks and to close the transport cleanly.
+"""
 from __future__ import annotations
 
 import asyncio
@@ -106,17 +108,21 @@ class MLServerProtocol(asyncio.DatagramProtocol):
         self._task_retransmit = None
         self._task_cleanup = None
         self._lock = threading.Lock()
+        self._loop: Optional[asyncio.AbstractEventLoop] = None
 
     def connection_made(self, transport):
         self.transport = transport
         sockname = transport.get_extra_info("sockname")
         logger.info("ML server listening on %s", sockname)
         loop = asyncio.get_event_loop()
+        self._loop = loop
+        # schedule background maintenance tasks on this loop
         self._task_retransmit = loop.create_task(self._retransmit_loop())
         self._task_cleanup = loop.create_task(self._cleanup_loop())
 
     def connection_lost(self, exc):
         logger.info("ML server connection lost")
+        # cancel background tasks if present
         if self._task_retransmit:
             self._task_retransmit.cancel()
         if self._task_cleanup:
@@ -447,3 +453,83 @@ class MLServerProtocol(asyncio.DatagramProtocol):
         except Exception:
             logger.exception("Error in _cleanup_loop")
             raise
+
+    # ----------------------------
+    # New: graceful shutdown API
+    # ----------------------------
+    async def stop(self, wait_timeout: float = 2.0) -> None:
+        """
+        Gracefully stop the ML server protocol's background tasks and close the transport.
+        This should be called from the event loop that created/owns the protocol (or awaited via run_coroutine_threadsafe).
+        """
+        logger.info("Stopping MLServerProtocol (graceful shutdown)")
+
+        # Cancel retransmit/cleanup tasks and await their termination (best-effort)
+        tasks = []
+        if self._task_retransmit:
+            self._task_retransmit.cancel()
+            tasks.append(self._task_retransmit)
+            self._task_retransmit = None
+        if self._task_cleanup:
+            self._task_cleanup.cancel()
+            tasks.append(self._task_cleanup)
+            self._task_cleanup = None
+
+        if tasks:
+            try:
+                await asyncio.wait_for(asyncio.gather(*[asyncio.shield(t) for t in tasks], return_exceptions=True), timeout=wait_timeout)
+            except Exception:
+                # ignore timeouts / cancelled errors, we are forcing shutdown
+                pass
+
+        # Close transport
+        try:
+            if self.transport:
+                try:
+                    self.transport.close()
+                except Exception:
+                    logger.exception("Error closing ML transport")
+                self.transport = None
+        except Exception:
+            logger.exception("Error during transport close")
+
+        # Clean internal maps (best-effort)
+        try:
+            with self._lock:
+                self.pending_outgoing.clear()
+                self.last_acks.clear()
+                self.seen_msgs.clear()
+        except Exception:
+            logger.exception("Error clearing internal ML server state")
+
+        logger.info("MLServerProtocol stopped")
+
+    def stop_sync(self, wait_timeout: float = 5.0) -> None:
+        """
+        Synchronous wrapper to stop the ML server from another thread.
+        Uses run_coroutine_threadsafe on the loop that owns the protocol (if available).
+        """
+        if self._loop is None:
+            # nothing scheduled; nothing to stop
+            try:
+                if self.transport:
+                    self.transport.close()
+            except Exception:
+                pass
+            return
+        try:
+            fut = asyncio.run_coroutine_threadsafe(self.stop(wait_timeout), self._loop)
+            try:
+                fut.result(timeout=wait_timeout + 1.0)
+            except Exception:
+                fut.cancel()
+        except Exception:
+            logger.exception("stop_sync failed; attempted best-effort transport close")
+            try:
+                if self.transport:
+                    self.transport.close()
+            except Exception:
+                pass
+
+
+# End of file

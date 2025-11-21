@@ -48,7 +48,7 @@ def _extract_rover_and_addr(payload: Any, maybe_addr: Any = None) -> Tuple[Optio
             ip = addr_info.get("ip")
             port = addr_info.get("port")
             try:
-                if ip and port is not None:
+                if ip is not None and port is not None:
                     addr = (str(ip), int(port))
             except Exception:
                 addr = None
@@ -92,32 +92,101 @@ def register_telemetry_hooks(mission_store: Any, telemetry_store: Any) -> None:
     """
 
     def _core_register(rover_id: Optional[str], addr: Optional[Tuple[str, int]]):
+        """
+        Idempotent registration: only call mission_store.register_rover when the rover
+        is not known or its stored address differs from the provided one.
+        This avoids noisy repeated INFO logs when telem samples arrive frequently.
+        """
         if not rover_id:
             return
         try:
-            # Try preferred kwarg signature first
+            # Normalize incoming addr to tuple or None
+            norm_addr: Optional[Tuple[str, int]] = None
+            if isinstance(addr, dict):
+                try:
+                    ip = addr.get("ip")
+                    port = addr.get("port")
+                    if ip is not None and port is not None:
+                        norm_addr = (str(ip), int(port))
+                except Exception:
+                    norm_addr = None
+            elif isinstance(addr, (tuple, list)) and len(addr) >= 2:
+                try:
+                    norm_addr = (str(addr[0]), int(addr[1]))
+                except Exception:
+                    norm_addr = None
+
+            # Try to examine existing registration to decide if we must call register_rover
+            existing = None
             try:
-                mission_store.register_rover(rover_id, address=addr)
-                logger.info("telemetry_hooks: registered rover %s addr=%s", rover_id, addr)
-                return
-            except TypeError:
-                pass
-            # Fallback positional
-            try:
-                mission_store.register_rover(rover_id, addr)
-                logger.info("telemetry_hooks: registered rover %s addr=%s", rover_id, addr)
-                return
-            except TypeError:
-                pass
-            # Last resort: register by id only
-            try:
-                mission_store.register_rover(rover_id)
-                logger.info("telemetry_hooks: registered rover %s (no addr)", rover_id)
-                return
+                if hasattr(mission_store, "get_rover"):
+                    existing = mission_store.get_rover(rover_id)
             except Exception:
-                logger.exception("telemetry_hooks: failed to register rover %s", rover_id)
+                existing = None
+
+            should_register = False
+            # If no existing record, we should register
+            if existing is None:
+                should_register = True
+            else:
+                # existing may contain an 'address' entry of form {"ip":..., "port":...}
+                existing_addr = None
+                if isinstance(existing, dict):
+                    existing_addr = existing.get("address") or existing.get("addr")
+                # normalize existing_addr to tuple if possible
+                ex_addr_tup = None
+                if isinstance(existing_addr, dict):
+                    try:
+                        ex_ip = existing_addr.get("ip")
+                        ex_port = existing_addr.get("port")
+                        if ex_ip is not None and ex_port is not None:
+                            ex_addr_tup = (str(ex_ip), int(ex_port))
+                    except Exception:
+                        ex_addr_tup = None
+                elif isinstance(existing_addr, (tuple, list)) and len(existing_addr) >= 2:
+                    try:
+                        ex_addr_tup = (str(existing_addr[0]), int(existing_addr[1]))
+                    except Exception:
+                        ex_addr_tup = None
+
+                # If we have a normalized incoming addr and it differs from stored one, re-register
+                if norm_addr and ex_addr_tup is None:
+                    should_register = True
+                elif norm_addr and ex_addr_tup and (norm_addr[0] != ex_addr_tup[0] or int(norm_addr[1]) != int(ex_addr_tup[1])):
+                    should_register = True
+                # If stored had no addr and incoming also none -> don't re-register
+                # If both present and equal -> no-op
+
+            if should_register:
+                try:
+                    # Try preferred kwarg signature first
+                    try:
+                        mission_store.register_rover(rover_id, address=norm_addr)
+                        logger.info("telemetry_hooks: registered rover %s addr=%s", rover_id, norm_addr)
+                        return
+                    except TypeError:
+                        pass
+                    # Fallback positional
+                    try:
+                        mission_store.register_rover(rover_id, norm_addr)
+                        logger.info("telemetry_hooks: registered rover %s addr=%s", rover_id, norm_addr)
+                        return
+                    except TypeError:
+                        pass
+                    # Last resort: register by id only
+                    try:
+                        mission_store.register_rover(rover_id)
+                        logger.info("telemetry_hooks: registered rover %s (no addr)", rover_id)
+                        return
+                    except Exception:
+                        logger.exception("telemetry_hooks: failed to register rover %s", rover_id)
+                except Exception:
+                    logger.exception("telemetry_hooks: unexpected error while registering rover %s", rover_id)
+            else:
+                # avoid INFO spam — debug is sufficient to indicate repeated registrations
+                logger.debug("telemetry_hooks: rover %s already registered addr=%s (no-op)", rover_id, norm_addr)
         except Exception:
-            logger.exception("telemetry_hooks: unexpected error while registering rover %s", rover_id)
+            logger.exception("telemetry_hooks: unexpected error while attempting _core_register")
 
     def _handle_mission_from_telemetry(rover_id: str, telemetry: Dict[str, Any]) -> None:
         """
@@ -213,7 +282,7 @@ def register_telemetry_hooks(mission_store: Any, telemetry_store: Any) -> None:
             # Only handle telemetry-like events primarily, but keep tolerant to other event names
             rover_id, addr = _extract_rover_and_addr(payload, maybe_addr)
 
-            # Register rover (updates last_seen/address)
+            # Register rover (updates last_seen/address) only when necessary
             _core_register(rover_id, addr)
 
             # Forward telemetry to mission store if we have a telemetry dict

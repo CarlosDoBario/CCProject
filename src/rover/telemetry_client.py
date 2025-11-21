@@ -8,13 +8,8 @@ Provides:
   reader loop to receive server frames (commands/acks), and a simple
   on_command(callback) hook for handling server-issued commands.
 
-Usage (one-shot):
-    await send_once(host, port, rover_id, telemetry)
-
-Usage (persistent):
-    client = TelemetryClient(rover_id="R-1", host="127.0.0.1", port=65080, interval_s=1.0)
-    client.on_command(my_callback)  # optional
-    asyncio.run(run_persistent(client))  # keeps process alive until Ctrl-C
+This file implements a complete CLI entrypoint that accepts:
+  --host, --port, --rover-id, --once, --interval, --ack, --ack-timeout, --crc
 """
 from __future__ import annotations
 
@@ -36,11 +31,9 @@ logger = utils.get_logger("rover.telemetry_client")
 async def send_once(host: str, port: int, rover_id: str, telemetry: dict, ack_requested: bool = False, ack_timeout: float = 5.0, include_crc: bool = False):
     """
     Open a TCP connection, send a single framed telemetry message and optionally wait for an ACK.
-    This function is unchanged from the previous implementation (kept for compatibility).
     """
     reader, writer = await asyncio.open_connection(host, port)
     try:
-        # convert telemetry dict to TLVs
         tlvs = []
         pos = telemetry.get("position")
         if pos:
@@ -118,7 +111,6 @@ class TelemetryClient:
         self.backoff_base = float(backoff_base)
         self.backoff_factor = float(backoff_factor)
         self.include_crc = bool(include_crc)
-        # telemetry_provider: callable returning a telemetry dict (sync or coroutine)
         self.telemetry_provider = telemetry_provider
         self._reader: Optional[asyncio.StreamReader] = None
         self._writer: Optional[asyncio.StreamWriter] = None
@@ -170,7 +162,11 @@ class TelemetryClient:
         try:
             if self._writer:
                 self._writer.close()
-                await self._writer.wait_closed()
+                # guard wait_closed so shutdown doesn't hang indefinitely
+                try:
+                    await asyncio.wait_for(self._writer.wait_closed(), timeout=1.0)
+                except Exception:
+                    pass
         except Exception:
             pass
         self._reader = None
@@ -231,7 +227,7 @@ class TelemetryClient:
                 canonical = binary_proto.tlv_to_canonical(tlvs)
                 # include header metadata for callbacks
                 canonical["_msgid"] = header.get("msgid")
-                canonical["_ts_server_sent_ms"] = header.get("timestamp", None)
+                canonical["_ts_server_sent_ms"] = header.get("timestamp_ms", None)
 
                 msgtype = header.get("msgtype")
                 logger.debug("TelemetryClient %s received msgtype=%s keys=%s", self.rover_id, msgtype, list(canonical.keys()))
@@ -430,7 +426,8 @@ class TelemetryClient:
             logger.info("TelemetryClient %s reconnecting after %.2f s", self.rover_id, sleep_for)
             await asyncio.sleep(sleep_for)
 
-# CLI for convenience - kept compatible with previous script usage
+
+# CLI helper to run persistent client until cancelled
 async def _run_persistent(client: 'TelemetryClient'):
     """
     Helper coroutine that starts the persistent client and keeps the process alive
@@ -451,23 +448,46 @@ async def _run_persistent(client: 'TelemetryClient'):
         except Exception:
             logger.exception("Error stopping TelemetryClient")
 
+
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--host", default=config.TELEMETRY_HOST)
-    parser.add_argument("--port", type=int, default=config.TELEMETRY_PORT)
-    parser.add_argument("--rover-id", required=True)
-    parser.add_argument("--once", action="store_true")
-    parser.add_argument("--interval", type=float, default=config.DEFAULT_UPDATE_INTERVAL_S)
-    parser.add_argument("--ack", action="store_true", help="request ACK from server (wait briefly)")
-    parser.add_argument("--ack-timeout", type=float, default=5.0)
-    parser.add_argument("--crc", action="store_true", help="include CRC32 trailer in TS frame")
+    parser = argparse.ArgumentParser(description="Telemetry client (rover) for TelemetryStream (TS)")
+    parser.add_argument("--host", default=config.TELEMETRY_HOST, help="Telemetry server host")
+    parser.add_argument("--port", type=int, default=config.TELEMETRY_PORT, help="Telemetry server port")
+    parser.add_argument("--rover-id", required=True, help="Rover identifier")
+    parser.add_argument("--once", action="store_true", help="Send a single telemetry sample and exit")
+    parser.add_argument("--interval", type=float, default=config.DEFAULT_UPDATE_INTERVAL_S, help="Telemetry update interval in seconds for persistent mode")
+    parser.add_argument("--ack", action="store_true", help="Request application-level ACK from server (used with --once)")
+    parser.add_argument("--ack-timeout", type=float, default=5.0, help="Timeout to wait for ACK when --once and --ack are used")
+    parser.add_argument("--crc", action="store_true", help="Include CRC32 trailer in TS frame")
+    parser.add_argument("--reconnect", action="store_true", help="Enable automatic reconnect for persistent client (default enabled)")
     args = parser.parse_args()
 
-    # simple CLI: if --once use send_once, otherwise start persistent runner
+    # Run appropriate mode
     if args.once:
-        asyncio.run(send_once(args.host, args.port, args.rover_id, {"position": {"x": 0.0, "y": 0.0, "z": 0.0}, "battery_level_pct": 100, "status": "IDLE", "progress_pct": 0.0}, ack_requested=args.ack, ack_timeout=args.ack_timeout, include_crc=args.crc))
+        # Build a minimal telemetry sample and send once
+        sample = {
+            "timestamp_ms": binary_proto.now_ms(),
+            "position": {"x": 0.0, "y": 0.0, "z": 0.0},
+            "battery_level_pct": 100,
+            "status": "IDLE",
+            "progress_pct": 0.0,
+        }
+        try:
+            asyncio.run(send_once(args.host, args.port, args.rover_id, sample, ack_requested=args.ack, ack_timeout=args.ack_timeout, include_crc=args.crc))
+        except KeyboardInterrupt:
+            logger.info("Interrupted by user")
+        except Exception:
+            logger.exception("send_once failed")
     else:
-        client = TelemetryClient(rover_id=args.rover_id, host=args.host, port=args.port, interval_s=args.interval, include_crc=args.crc)
+        # Persistent mode
+        client = TelemetryClient(
+            rover_id=args.rover_id,
+            host=args.host,
+            port=args.port,
+            interval_s=args.interval,
+            reconnect=args.reconnect,
+            include_crc=args.crc,
+        )
         try:
             asyncio.run(_run_persistent(client))
         except KeyboardInterrupt:

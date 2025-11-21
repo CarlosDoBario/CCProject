@@ -232,22 +232,35 @@ def parse_ts_payload(payload: bytes) -> Dict[str, Any]:
     """
     Parse TS payload (no 4-byte length). Verify CRC if flags indicate it.
     Returns dict with keys: header, rover_id, tlvs (dict mapping type->list of bytes)
+
+    Notes:
+    - validates that when FLAG_CRC32 is set the payload includes the 4-byte CRC trailer.
+    - raises ValueError on malformed payload (truncated header/rover id/CRC/TLVs).
     """
     if len(payload) < TS_HEADER_SIZE + 1:
         raise ValueError("TS payload too short")
+    # unpack header first (may be used to determine whether CRC is present)
     header = unpack_ts_header(payload[:TS_HEADER_SIZE])
     pos = TS_HEADER_SIZE
     # RoverID
+    if pos >= len(payload):
+        raise ValueError("TS rover id length byte missing")
     rid_len = payload[pos]
     pos += 1
     if pos + rid_len > len(payload):
         raise ValueError("TS rover id truncated")
     rover_id = payload[pos:pos + rid_len].decode("utf-8")
     pos += rid_len
-    # If CRC flag set, last 4 bytes are CRC
+    # If CRC flag set, ensure we have at least 4 bytes for CRC trailer
     has_crc = bool(header["flags"] & FLAG_CRC32)
+    if has_crc:
+        if len(payload) < pos + 4:
+            raise ValueError("TS payload too short for CRC trailer")
     end_crc_pos = len(payload) - 4 if has_crc else len(payload)
+    if end_crc_pos < pos:
+        raise ValueError("TS payload malformed: CRC position before TLV block")
     tlv_block = payload[pos:end_crc_pos]
+    # parse TLVs (this will raise ValueError on truncated/extra bytes)
     tlv_list = unpack_tlvs(tlv_block)
     tlv_map: Dict[int, List[bytes]] = {}
     for t, v in tlv_list:
