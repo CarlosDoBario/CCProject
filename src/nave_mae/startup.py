@@ -17,8 +17,7 @@ import asyncio
 import logging
 import threading
 import inspect
-from typing import Optional, Dict, Any
-
+from typing import Optional, Dict, Any 
 from common import config, utils
 
 logger = utils.get_logger("ml.startup")
@@ -31,6 +30,7 @@ def _safe_import(name: str):
     except Exception:
         return None
 
+_API_MOD = _safe_import("nave_mae.api_server")
 
 async def start_services(
     host: str = "127.0.0.1",
@@ -39,13 +39,14 @@ async def start_services(
     ml_host: str = "127.0.0.1",
     ml_port: Optional[int] = None,
     persist_file: Optional[str] = None,
+    start_api_server: bool = True, # <-- VARIÁVEL UTILIZADA AQUI
 ) -> Dict[str, Any]:
     """
     Create MissionStore and TelemetryStore, register hooks and start TelemetryServer.
     Optionally attempt to start the ML server if start_ml_server=True and a suitable entry is found.
 
     Returns a dict:
-      { "ms": MissionStore, "ts": TelemetryStore, "telemetry_server": TelemetryServer, "ml_server": ml_server_handle_or_None }
+      { "ms": MissionStore, "ts": TelemetryStore, "telemetry_server": TelemetryServer, "ml_server": ml_server_handle_or_None, "api_server": api_server_handle_or_None }
 
     ml_server_handle may be:
       - an asyncio.Task if the entrypoint was a coroutine and was scheduled on the loop
@@ -61,6 +62,7 @@ async def start_services(
     ts = None
     telemetry_server = None
     ml_server_handle = None
+    api_server_handle = None # Inicializamos o handle da API
 
     # Try to create MissionStore early (start_telemetry_server will also create one if None)
     try:
@@ -87,6 +89,14 @@ async def start_services(
     except Exception:
         logger.exception("Failed to start telemetry server via startup.start_services")
         raise
+    
+    if _API_MOD and ms and ts:
+        try:
+            _API_MOD.setup_stores(ms, ts)
+            _API_MOD.register_broadcast_hook()
+            logger.info("API broadcast hooks registrados e stores injetados.")
+        except Exception:
+            logger.exception("Falha ao registrar broadcast hooks.")
 
     # Optionally try to start ML server module if requested (best-effort; non-fatal)
     if start_ml_server:
@@ -154,10 +164,35 @@ async def start_services(
             if not started:
                 logger.warning("Could not find runnable entrypoint in nave_mae.ml_server; ML server not started automatically")
 
-    return {"ms": ms, "ts": ts, "telemetry_server": telemetry_server, "ml_server": ml_server_handle}
+    # -------------------------------------------------------------------
+    # CORREÇÃO AQUI: Lançar Servidor API (FastAPI) dentro da função
+    # -------------------------------------------------------------------
+    if start_api_server and _API_MOD:
+        try:
+            # Uvicorn (FastAPI) é um servidor síncrono, lançamos numa Thread Daemon
+            def _run_api():
+                _API_MOD.run_api_server(host=config.API_HOST, port=config.API_PORT)
+                
+            th = threading.Thread(target=_run_api, name="api-server-thread", daemon=True)
+            th.start()
+            api_server_handle = th
+            logger.info("API Server (FastAPI) iniciado em thread.")
+        except Exception:
+            logger.exception("Falha ao iniciar API Server")
+            
+    # -------------------------------------------------------------------
+    # RETORNO FINAL: Incluir o handle do API Server
+    # -------------------------------------------------------------------
+    return {
+        "ms": ms, 
+        "ts": ts, 
+        "telemetry_server": telemetry_server, 
+        "ml_server": ml_server_handle,
+        "api_server": api_server_handle # <-- NOVO
+    }
 
 
-def run_forever(host: str = "127.0.0.1", telemetry_port: int = None, start_ml_server: bool = False, ml_host: str = "127.0.0.1", ml_port: Optional[int] = None, persist_file: Optional[str] = None):
+def run_forever(host: str = "127.0.0.1", telemetry_port: int = None, start_ml_server: bool = False, ml_host: str = "127.0.0.1", ml_port: Optional[int] = None, persist_file: Optional[str] = None, start_api_server: bool = True):
     """
     CLI helper: start services and block until Ctrl-C.
     """
@@ -173,7 +208,8 @@ def run_forever(host: str = "127.0.0.1", telemetry_port: int = None, start_ml_se
     asyncio.set_event_loop(loop)
     services = {}
     try:
-        services = loop.run_until_complete(start_services(host=host, telemetry_port=telemetry_port, start_ml_server=start_ml_server, ml_host=ml_host, ml_port=ml_port, persist_file=persist_file))
+        # start_services agora gere o arranque da API com base em start_api_server
+        services = loop.run_until_complete(start_services(host=host, telemetry_port=telemetry_port, start_ml_server=start_ml_server, ml_host=ml_host, ml_port=ml_port, persist_file=persist_file, start_api_server=start_api_server))
         logger.info("All services started; press Ctrl-C to stop")
         loop.run_forever()
     except KeyboardInterrupt:

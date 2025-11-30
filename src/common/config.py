@@ -85,6 +85,10 @@ TELEMETRY_PORT: int = _parse_int(os.environ.get("TELEMETRY_PORT"), 65080)
 ML_HOST: str = _parse_str(os.environ.get("ML_HOST"), "0.0.0.0")
 ML_UDP_PORT: int = _parse_int(os.environ.get("ML_UDP_PORT"), 64070)
 
+# API de Observação / Ground Control
+API_HOST: str = _parse_str(os.environ.get("API_HOST"), "0.0.0.0")
+API_PORT: int = _parse_int(os.environ.get("API_PORT"), 65000)
+
 # Datagram sizing (ML)
 ML_MAX_DATAGRAM_SIZE: int = _parse_int(os.environ.get("ML_MAX_DATAGRAM_SIZE"), 1200)
 
@@ -146,6 +150,8 @@ __all__ = [
     "TELEMETRY_PORT",
     "ML_HOST",
     "ML_UDP_PORT",
+    "API_HOST",
+    "API_PORT",
     "ML_MAX_DATAGRAM_SIZE",
     "DEFAULT_UPDATE_INTERVAL_S",
     "TIMEOUT_TX_INITIAL",
@@ -180,4 +186,4 @@ ACK_JITTER = _parse_float(os.environ.get("ACK_JITTER"), 0.5)
 
 # Misc compatibility aliases
 ENV = _parse_str(os.environ.get("ENV"), "development")
-# ----------------------------------------------------------------
+
