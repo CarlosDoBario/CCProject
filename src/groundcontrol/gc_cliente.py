@@ -1,155 +1,271 @@
+#!/usr/bin/env python3
+"""
+Ground Control client (console) - robust WebSocket consumer that applies
+MISSION_SNAPSHOT, ROVER_REGISTERED, TELEMETRY, TELEMETRY_UPDATE and similar events
+immediately on first receipt.
+
+Execute:
+  $env:PYTHONPATH="src"; python -m groundcontrol.gc_cliente
+
+Requisitos:
+  pip install websockets
+"""
+from __future__ import annotations
 import asyncio
 import json
 import os
+import logging
+import signal
+import sys
 from typing import Dict, Any, Optional
-import websockets
-import time
 
-# Configs e Utilitários (assumindo importação do PYTHONPATH=src)
-from common import config, utils
+from common import config
 
-logger = utils.get_logger("gc.client")
+try:
+    import websockets
+except Exception:
+    print("Instala a dependência 'websockets' (pip install websockets) e tenta de novo.")
+    raise
 
-# URL da API (usando configs)
-WS_URL = f"ws://{config.TELEMETRY_HOST}:{config.API_PORT}/ws/subscribe"
-API_PORT = config.API_PORT # Para logging
+# Configure logging from env
+LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO").upper()
+logging.basicConfig(level=LOG_LEVEL, format="%(asctime)s %(levelname)s [gc_cliente] %(message)s")
+logger = logging.getLogger("gc_cliente")
 
-# --- Gerenciamento do Display e Estado ---
-class GroundControlDisplay:
-    def __init__(self):
-        # Estado local (cópia da verdade central)
-        self.rovers: Dict[str, Any] = {}
-        self.missions: Dict[str, Dict[str, Any]] = {}
-        self.status_message: str = "Aguardando conexão..."
-        self.last_render_time: float = 0.0
+WS_HOST = "127.0.0.1" if config.API_HOST == "0.0.0.0" else config.API_HOST
+WS_URL = f"ws://{WS_HOST}:{config.API_PORT}/ws/subscribe"
 
-    def _clear_and_print(self, content: str):
-        # Limpar o ecrã (depende do SO)
-        os.system('cls' if os.name == 'nt' else 'clear') 
-        print(content)
+# In-memory state
+rovers: Dict[str, Dict[str, Any]] = {}     # rover_id -> telemetry/state dict
+missions: Dict[str, Any] = {}              # mission_id -> mission data (optional)
 
-    def render_cli(self, force: bool = False):
-        """ Renderiza o estado no terminal, limitando o refresh rate. """
-        
-        now = time.time()
-        if not force and (now - self.last_render_time < 0.5): # Limite a 2 FPS
-            return
-            
-        self.last_render_time = now
-        
-        output = [
-            "-" * 60,
-            f"🛰️ GROUND CONTROL CLIENT - Status: {self.status_message}",
-            "-" * 60
-        ]
-        
-        # 1. VISUALIZAÇÃO DE MISSÕES E PROGRESSO
-        output.append("### Missões Ativas / Pendentes:")
-        
-        missions_to_display = sorted(
-            [m for m in self.missions.values() if m.get("state") not in ["COMPLETED", "CANCELLED"]], 
-            key=lambda m: (-int(m.get('priority', 0)), m.get('mission_id', ''))
-        )
-        
-        if not missions_to_display:
-            output.append("  Nenhuma missão ativa ou pendente.")
-            
-        for m in missions_to_display:
-            mid = m.get("mission_id", "N/A")
-            state = m.get("state", "N/A")
-            prog = m.get("last_progress_pct", 0.0)
-            rover = m.get("assigned_rover", "N/A")
-            
-            output.append(f"  [{mid:<6}] Estado: {state:<12} | Rover: {rover:<6} | Progresso: {prog:>6.2f}%")
 
-        output.append("-" * 60)
-
-        # 2. VISUALIZAÇÃO DE ROVERS (TELEMETRIA E ESTADO)
-        output.append("### Estado e Localização dos Rovers:")
-        
-        if not self.rovers:
-            output.append("  Nenhum Rover online ou registado.")
-            
-        for rid, data in self.rovers.items():
-            pos = data.get("position", {})
-            batt = data.get("battery_level_pct", 0)
-            status = data.get("status", "N/A").upper()
-            x, y, z = pos.get("x", 0.0), pos.get("y", 0.0), pos.get("z", 0.0)
-            
-            # Formato de apresentação legível
-            output.append(f"  {rid:<6} | STATUS: {status:<10} | POS: ({x:>7.2f}, {y:>7.2f}, {z:>5.2f}) | BATT: {batt:>5.1f}%")
-            
-        output.append("-" * 60)
-        self._clear_and_print("\n".join(output))
-
-    def handle_event(self, event: Dict[str, Any]):
-        """ Processa e armazena o estado com base nos eventos WebSocket. """
-        
-        event_type = event.get("event")
-        data = event.get("data", {})
-        
-        if event_type == "MISSION_SNAPSHOT" and data:
-            # Recebe o estado inicial do MissionStore (snapshot completo)
-            self.missions = data.get("missions", {})
-            self.rovers = data.get("rovers", {}) # Inicializa com os rovers conhecidos
-            self.status_message = "CONECTADO: Snapshot inicial carregado"
-
-        elif event_type == "TELEMETRY_UPDATE" and data.get("rover_id"):
-            rid = data["rover_id"]
-            # Atualiza o estado da telemetria (posição, bateria)
-            self.rovers[rid] = {**self.rovers.get(rid, {}), **data}
-        
-        elif event_type in ["MISSION_PROGRESS", "MISSION_ASSIGNED", "MISSION_COMPLETE", "MISSION_CANCEL", "MISSION_RECOVERED"]:
-            # Eventos que afetam o estado da missão
-            mid = data.get("mission_id")
-            if mid and data.get("mission"): # Atualiza o objeto de missão
-                m_update = data["mission"]
-                self.missions[mid] = {**self.missions.get(mid, {}), **m_update}
-
-            self.status_message = f"Evento de Missão: {mid} -> {event_type}"
-            
-        self.render_cli()
-
-# --- Loop de Comunicação e Execução ---
-async def listen_websocket(display: GroundControlDisplay):
-    """ Tenta conectar e manter o loop de escuta WebSocket. """
+def render_screen():
+    """Simple console rendering of current missions and rovers state."""
+    # Clear screen (basic)
     try:
-        async with websockets.connect(WS_URL) as websocket:
-            display.status_message = "CONECTADO: A receber streaming de eventos"
-            display.render_cli(force=True)
-            
-            # Loop principal de escuta
-            async for message in websocket:
-                try:
-                    event = json.loads(message)
-                    display.handle_event(event)
-                except json.JSONDecodeError:
-                    logger.warning("Mensagem JSON inválida recebida.")
-                except Exception as e:
-                    logger.exception("Falha ao processar evento.")
-                    
-    except ConnectionRefusedError:
-        display.status_message = f"FALHA DE CONEXÃO: Nave-Mãe offline em {API_PORT}."
-        logger.error(display.status_message)
-    except websockets.exceptions.ConnectionClosed:
-        display.status_message = "DESCONECTADO: Conexão fechada."
-    except Exception as e:
-        display.status_message = f"ERRO CRÍTICO: {e}"
-        logger.exception(display.status_message)
+        os.system('cls' if os.name == 'nt' else 'clear')
+    except Exception:
+        pass
+
+    print("-" * 60)
+    print("🛰️  GROUND CONTROL CLIENT - Status: CONECTADO")
+    print("-" * 60)
+    # Missions summary
+    print("### Missões Ativas / Pendentes:")
+    if not missions:
+        print("  Nenhuma missão ativa ou pendente.")
+    else:
+        for mid, m in missions.items():
+            state = m.get("state", "UNKNOWN")
+            task = m.get("task", "")
+            progress = m.get("last_progress_pct", 0.0)
+            print(f"  {mid} | {task} | STATE: {state} | PROG: {progress:.1f}%")
+    print("-" * 60)
+    # Rovers
+    print("### Estado e Localização dos Rovers:")
+    if not rovers:
+        print("  Nenhum Rover online ou registado.")
+    else:
+        for rid, data in rovers.items():
+            pos = data.get("position", {})
+            x = pos.get("x", 0.0)
+            y = pos.get("y", 0.0)
+            z = pos.get("z", 0.0)
+            batt = data.get("battery_level_pct", 0.0)
+            prog = data.get("progress_pct", 0.0)
+            status = data.get("status", "N/A")
+            print(f"  {rid} | STATUS: {status:7} | POS: ({x:6.2f}, {y:6.2f}, {z:5.2f}) | BATT: {batt:6.1f}% | PROG: {prog:6.1f}%")
+    print("-" * 60)
 
 
-async def main_async():
-    display = GroundControlDisplay()
-    
-    # Loop de reconexão
+def apply_telemetry(rover_id: str, telemetry: Dict[str, Any]):
+    """Merge telemetry into in-memory rover state and render screen."""
+    if rover_id not in rovers:
+        rovers[rover_id] = {}
+    # Merge fields (flat merge is fine for our console)
+    rovers[rover_id].update(telemetry)
+    # ensure rover_id present on state
+    rovers[rover_id]["rover_id"] = rover_id
+    logger.debug("Applied telemetry for %s: %s", rover_id, telemetry)
+    render_screen()
+
+
+def handle_mission_snapshot(data: Dict[str, Any]):
+    """Process mission snapshot and optional rovers block."""
+    ms = data.get("missions", {}) if isinstance(data, dict) else {}
+    rovers_block = data.get("rovers", {}) if isinstance(data, dict) else {}
+    # Replace missions state
+    missions.clear()
+    if isinstance(ms, dict):
+        missions.update(ms)
+    # Merge rovers if provided
+    for rid, latest in (rovers_block or {}).items():
+        if isinstance(latest, dict):
+            apply_telemetry(rid, latest)
+    # Final render
+    render_screen()
+
+
+def handle_rover_registered(data: Dict[str, Any]):
+    """Handle rover registration event (ensure rover exists)."""
+    rid = data.get("rover_id") or data.get("id") or data.get("id_str")
+    if not rid:
+        return
+    if rid not in rovers:
+        rovers[rid] = {}
+    # Optionally store address
+    if "address" in data:
+        rovers[rid]["address"] = data.get("address")
+    logger.info("Rover registered: %s", rid)
+    render_screen()
+
+
+def handle_telemetry_event(data: Any):
+    """
+    Handle TELEMETRY and TELEMETRY_UPDATE style events.
+    Data may be:
+      - {"rover_id": ..., "telemetry": {...}}
+      - {...} (flat telemetry including rover_id and fields)
+      - {...} (just telemetry fields without rover_id) - ignored if no id present
+    """
+    if not isinstance(data, dict):
+        logger.debug("Telemetry event with non-dict data: %s", data)
+        return
+
+    # Case 1: wrapper with 'rover_id' + 'telemetry'
+    if "rover_id" in data and "telemetry" in data and isinstance(data["telemetry"], dict):
+        rid = data["rover_id"]
+        telemetry = data["telemetry"]
+        apply_telemetry(rid, telemetry)
+        return
+
+    # Case 2: flat telemetry including rover_id
+    if "rover_id" in data and "position" in data:
+        rid = data["rover_id"]
+        apply_telemetry(rid, data)
+        return
+
+    # Case 3: telemetry_update style where data is telemetry without rover_id
+    # try to recover rover_id from _maybe fields (not ideal)
+    rid = data.get("rover_id") or data.get("_rover_id") or None
+    if rid:
+        apply_telemetry(rid, data)
+        return
+
+    # If no rover_id, check if event included an outer key mapping (rare), skip otherwise
+    logger.debug("Received telemetry-like payload without rover_id: keys=%s", list(data.keys()))
+
+
+async def ws_consumer():
+    """Main websocket consumer loop with exponential backoff on connect errors."""
+    connect_url = WS_URL
+    backoff = 1.0  # seconds
+    max_backoff = 10.0
     while True:
-        await listen_websocket(display)
-        await asyncio.sleep(5) 
-        
+        try:
+            logger.info("Connecting to %s", connect_url)
+            async with websockets.connect(connect_url) as ws:
+                logger.info("Connected to API WebSocket")
+                backoff = 1.0  # reset backoff after success
+                # render initial waiting screen
+                render_screen()
+                while True:
+                    try:
+                        msg = await ws.recv()
+                    except websockets.ConnectionClosed:
+                        logger.warning("WebSocket connection closed by server")
+                        break
+                    # Some servers may send simple PING text
+                    if isinstance(msg, bytes):
+                        try:
+                            msg = msg.decode("utf-8")
+                        except Exception:
+                            logger.debug("Received non-utf8 bytes message")
+                            continue
+
+                    # Try parse JSON
+                    parsed = None
+                    try:
+                        parsed = json.loads(msg)
+                    except Exception:
+                        # handle non-json text such as "PING"
+                        txt = msg.strip()
+                        if txt.upper() == "PING":
+                            logger.debug("Received PING")
+                            # no-op; keepalive
+                            continue
+                        logger.debug("Received non-JSON WS message: %s", repr(msg))
+                        continue
+
+                    # Expected shape: {"event": "...", "data": {...}, "ts": "..."}
+                    ev = parsed.get("event") or parsed.get("type") or None
+                    pdata = parsed.get("data", parsed)
+
+                    logger.debug("Received event=%s data_keys=%s", ev, list(pdata.keys()) if isinstance(pdata, dict) else type(pdata))
+
+                    if ev == "MISSION_SNAPSHOT":
+                        # pdata should contain { "missions":..., "rovers": ... }
+                        handle_mission_snapshot(pdata)
+                    elif ev == "ROVER_REGISTERED":
+                        handle_rover_registered(pdata)
+                    elif ev in ("TELEMETRY", "TELEMETRY_UPDATE", "TELEMETRY_UPDATE_V1", "TELEMETRY_UPDATE_V2"):
+                        # robustly handle different telemetry event shapes
+                        handle_telemetry_event(pdata)
+                    else:
+                        # fallback: if data looks like telemetry, try to apply
+                        if isinstance(pdata, dict) and ("position" in pdata or "battery_level_pct" in pdata):
+                            # attempt to find rover_id field
+                            if "rover_id" in pdata:
+                                apply_telemetry(pdata["rover_id"], pdata)
+                            else:
+                                logger.debug("Received telemetry-like payload without explicit event: %s", pdata.keys())
+                        else:
+                            logger.debug("Unhandled WS event: %s", ev)
+        except Exception as e:
+            # Handle ConnectionRefused gracefully with longer backoff and no traceback spam
+            if isinstance(e, ConnectionRefusedError) or "ConnectionRefusedError" in repr(e):
+                logger.info("WebSocket connection refused by server — reconnecting in %.1fs", backoff)
+            else:
+                logger.exception("WebSocket error / reconnecting in %.1fs: %s", backoff, e)
+            await asyncio.sleep(backoff)
+            backoff = min(max_backoff, backoff * 1.6)
+        # short delay before next loop iteration
+        await asyncio.sleep(0.2)
+
+
+def main():
+    # Create and set an explicit event loop for this thread/process.
+    # This avoids RuntimeError: "There is no current event loop in thread 'MainThread'."
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
+    # allow Ctrl+C to stop gracefully
+    def _on_sig(sig, frame):
+        logger.info("Signal received, stopping")
+        # Cancel all tasks running in this loop
+        for task in asyncio.all_tasks(loop):
+            task.cancel()
+
+    signal.signal(signal.SIGINT, _on_sig)
+    signal.signal(signal.SIGTERM, _on_sig)
+
+    try:
+        loop.run_until_complete(ws_consumer())
+    except asyncio.CancelledError:
+        logger.info("Stopped by user")
+    except Exception as e:
+        logger.exception("Unexpected error in main: %s", e)
+    finally:
+        try:
+            loop.run_until_complete(loop.shutdown_asyncgens())
+        except Exception:
+            pass
+        try:
+            loop.close()
+        except Exception:
+            pass
+
 
 if __name__ == "__main__":
-    # Certifique-se de que a Nave-Mãe (ml_server + telemetry_server + api_server) está a correr primeiro
-    try:
-        asyncio.run(main_async()) 
-    except KeyboardInterrupt:
-        logger.info("Ground Control encerrado pelo usuário.")
+    main()
