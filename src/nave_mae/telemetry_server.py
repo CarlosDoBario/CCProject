@@ -273,6 +273,15 @@ class TelemetryServer:
                         canonical = binary_proto.tlv_to_canonical(tlvs)
                         canonical["_msgid"] = header.get("msgid")
                         canonical["_ts_server_received_ms"] = binary_proto.now_ms()
+
+
+                        errors = canonical.get("errors") or []
+                        if any(err.get("code") == "BAT-EMERGENCY-ABORT" for err in errors):
+                            logger.error("!!! EMERGÊNCIA DE BATERIA DETETADA: Rover %s. Nível: %.1f%%. Missão abortada.", 
+                                         rid, canonical.get("battery_level_pct", 0.0))
+                            # Note: O rover já abortou a missão e está a regressar ao posto de carregamento.
+                            # Esta é apenas a notificação crítica para a Nave Mãe/Ground Control.
+                        
                         # TelemetryStore expected hook signature may differ; try common ones
                         if self.telemetry_store and hasattr(self.telemetry_store, "update"):
                             try:
