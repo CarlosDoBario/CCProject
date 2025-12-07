@@ -17,6 +17,7 @@ import os
 import logging
 import signal
 import sys
+import traceback
 from typing import Dict, Any, Optional
 
 from common import config
@@ -69,13 +70,17 @@ def render_screen():
     else:
         for rid, data in rovers.items():
             pos = data.get("position", {})
-            x = pos.get("x", 0.0)
-            y = pos.get("y", 0.0)
-            z = pos.get("z", 0.0)
-            batt = data.get("battery_level_pct", 0.0)
-            prog = data.get("progress_pct", 0.0)
+            x = pos.get("x", 0.0) if isinstance(pos, dict) else 0.0
+            y = pos.get("y", 0.0) if isinstance(pos, dict) else 0.0
+            z = pos.get("z", 0.0) if isinstance(pos, dict) else 0.0
+            batt = data.get("battery_level_pct", 0.0) if isinstance(data.get("battery_level_pct", 0.0), (int, float)) else 0.0
+            prog = data.get("progress_pct", 0.0) if isinstance(data.get("progress_pct", 0.0), (int, float)) else 0.0
             status = data.get("status", "N/A")
-            print(f"  {rid} | STATUS: {status:7} | POS: ({x:6.2f}, {y:6.2f}, {z:5.2f}) | BATT: {batt:6.1f}% | PROG: {prog:6.1f}%")
+            try:
+                print(f"  {rid} | STATUS: {status:7} | POS: ({x:6.2f}, {y:6.2f}, {z:5.2f}) | BATT: {batt:6.1f}% | PROG: {prog:6.1f}%")
+            except Exception:
+                # Defensive: avoid render crashes on bad types
+                print(f"  {rid} | STATUS: {status} | POS: {pos} | BATT: {batt} | PROG: {prog}")
     print("-" * 60)
 
 
@@ -84,7 +89,11 @@ def apply_telemetry(rover_id: str, telemetry: Dict[str, Any]):
     if rover_id not in rovers:
         rovers[rover_id] = {}
     # Merge fields (flat merge is fine for our console)
-    rovers[rover_id].update(telemetry)
+    if isinstance(telemetry, dict):
+        rovers[rover_id].update(telemetry)
+    else:
+        logger.debug("Telemetry for %s is not a dict, ignoring: %s", rover_id, type(telemetry))
+        return
     # ensure rover_id present on state
     rovers[rover_id]["rover_id"] = rover_id
     logger.debug("Applied telemetry for %s: %s", rover_id, telemetry)
@@ -93,32 +102,38 @@ def apply_telemetry(rover_id: str, telemetry: Dict[str, Any]):
 
 def handle_mission_snapshot(data: Dict[str, Any]):
     """Process mission snapshot and optional rovers block."""
-    ms = data.get("missions", {}) if isinstance(data, dict) else {}
-    rovers_block = data.get("rovers", {}) if isinstance(data, dict) else {}
-    # Replace missions state
-    missions.clear()
-    if isinstance(ms, dict):
-        missions.update(ms)
-    # Merge rovers if provided
-    for rid, latest in (rovers_block or {}).items():
-        if isinstance(latest, dict):
-            apply_telemetry(rid, latest)
-    # Final render
-    render_screen()
+    try:
+        ms = data.get("missions", {}) if isinstance(data, dict) else {}
+        rovers_block = data.get("rovers", {}) if isinstance(data, dict) else {}
+        # Replace missions state
+        missions.clear()
+        if isinstance(ms, dict):
+            missions.update(ms)
+        # Merge rovers if provided
+        for rid, latest in (rovers_block or {}).items():
+            if isinstance(latest, dict):
+                apply_telemetry(rid, latest)
+        # Final render
+        render_screen()
+    except Exception:
+        logger.exception("Error handling mission snapshot")
 
 
 def handle_rover_registered(data: Dict[str, Any]):
     """Handle rover registration event (ensure rover exists)."""
-    rid = data.get("rover_id") or data.get("id") or data.get("id_str")
-    if not rid:
-        return
-    if rid not in rovers:
-        rovers[rid] = {}
-    # Optionally store address
-    if "address" in data:
-        rovers[rid]["address"] = data.get("address")
-    logger.info("Rover registered: %s", rid)
-    render_screen()
+    try:
+        rid = data.get("rover_id") or data.get("id") or data.get("id_str")
+        if not rid:
+            return
+        if rid not in rovers:
+            rovers[rid] = {}
+        # Optionally store address
+        if "address" in data:
+            rovers[rid]["address"] = data.get("address")
+        logger.info("Rover registered: %s", rid)
+        render_screen()
+    except Exception:
+        logger.exception("Error handling rover_registered")
 
 
 def handle_telemetry_event(data: Any):
@@ -129,32 +144,35 @@ def handle_telemetry_event(data: Any):
       - {...} (flat telemetry including rover_id and fields)
       - {...} (just telemetry fields without rover_id) - ignored if no id present
     """
-    if not isinstance(data, dict):
-        logger.debug("Telemetry event with non-dict data: %s", data)
-        return
+    try:
+        if not isinstance(data, dict):
+            logger.debug("Telemetry event with non-dict data: %s", data)
+            return
 
-    # Case 1: wrapper with 'rover_id' + 'telemetry'
-    if "rover_id" in data and "telemetry" in data and isinstance(data["telemetry"], dict):
-        rid = data["rover_id"]
-        telemetry = data["telemetry"]
-        apply_telemetry(rid, telemetry)
-        return
+        # Case 1: wrapper with 'rover_id' + 'telemetry'
+        if "rover_id" in data and "telemetry" in data and isinstance(data["telemetry"], dict):
+            rid = data["rover_id"]
+            telemetry = data["telemetry"]
+            apply_telemetry(rid, telemetry)
+            return
 
-    # Case 2: flat telemetry including rover_id
-    if "rover_id" in data and "position" in data:
-        rid = data["rover_id"]
-        apply_telemetry(rid, data)
-        return
+        # Case 2: flat telemetry including rover_id
+        if "rover_id" in data and "position" in data:
+            rid = data["rover_id"]
+            apply_telemetry(rid, data)
+            return
 
-    # Case 3: telemetry_update style where data is telemetry without rover_id
-    # try to recover rover_id from _maybe fields (not ideal)
-    rid = data.get("rover_id") or data.get("_rover_id") or None
-    if rid:
-        apply_telemetry(rid, data)
-        return
+        # Case 3: telemetry_update style where data is telemetry without rover_id
+        # try to recover rover_id from _maybe fields (not ideal)
+        rid = data.get("rover_id") or data.get("_rover_id") or None
+        if rid:
+            apply_telemetry(rid, data)
+            return
 
-    # If no rover_id, check if event included an outer key mapping (rare), skip otherwise
-    logger.debug("Received telemetry-like payload without rover_id: keys=%s", list(data.keys()))
+        # If no rover_id, check if event included an outer key mapping (rare), skip otherwise
+        logger.debug("Received telemetry-like payload without rover_id: keys=%s", list(data.keys()))
+    except Exception:
+        logger.exception("Error handling telemetry event")
 
 
 async def ws_consumer():
@@ -184,44 +202,49 @@ async def ws_consumer():
                             logger.debug("Received non-utf8 bytes message")
                             continue
 
-                    # Try parse JSON
-                    parsed = None
+                    # PROCESS MESSAGE in a defensive try/except so we never crash here
                     try:
-                        parsed = json.loads(msg)
-                    except Exception:
-                        # handle non-json text such as "PING"
-                        txt = msg.strip()
-                        if txt.upper() == "PING":
-                            logger.debug("Received PING")
-                            # no-op; keepalive
+                        parsed = None
+                        try:
+                            parsed = json.loads(msg)
+                        except Exception:
+                            # handle non-json text such as "PING"
+                            txt = msg.strip()
+                            if txt.upper() == "PING":
+                                logger.debug("Received PING")
+                                # no-op; keepalive
+                                continue
+                            logger.debug("Received non-JSON WS message: %s", repr(msg))
                             continue
-                        logger.debug("Received non-JSON WS message: %s", repr(msg))
-                        continue
 
-                    # Expected shape: {"event": "...", "data": {...}, "ts": "..."}
-                    ev = parsed.get("event") or parsed.get("type") or None
-                    pdata = parsed.get("data", parsed)
+                        # Expected shape: {"event": "...", "data": {...}, "ts": "..."}
+                        ev = parsed.get("event") or parsed.get("type") or None
+                        pdata = parsed.get("data", parsed)
 
-                    logger.debug("Received event=%s data_keys=%s", ev, list(pdata.keys()) if isinstance(pdata, dict) else type(pdata))
+                        logger.debug("Received event=%s data_keys=%s", ev, list(pdata.keys()) if isinstance(pdata, dict) else type(pdata))
 
-                    if ev == "MISSION_SNAPSHOT":
-                        # pdata should contain { "missions":..., "rovers": ... }
-                        handle_mission_snapshot(pdata)
-                    elif ev == "ROVER_REGISTERED":
-                        handle_rover_registered(pdata)
-                    elif ev in ("TELEMETRY", "TELEMETRY_UPDATE", "TELEMETRY_UPDATE_V1", "TELEMETRY_UPDATE_V2"):
-                        # robustly handle different telemetry event shapes
-                        handle_telemetry_event(pdata)
-                    else:
-                        # fallback: if data looks like telemetry, try to apply
-                        if isinstance(pdata, dict) and ("position" in pdata or "battery_level_pct" in pdata):
-                            # attempt to find rover_id field
-                            if "rover_id" in pdata:
-                                apply_telemetry(pdata["rover_id"], pdata)
-                            else:
-                                logger.debug("Received telemetry-like payload without explicit event: %s", pdata.keys())
+                        if ev == "MISSION_SNAPSHOT":
+                            # pdata should contain { "missions":..., "rovers": ... }
+                            handle_mission_snapshot(pdata)
+                        elif ev == "ROVER_REGISTERED":
+                            handle_rover_registered(pdata)
+                        elif ev in ("TELEMETRY", "TELEMETRY_UPDATE", "TELEMETRY_UPDATE_V1", "TELEMETRY_UPDATE_V2"):
+                            # robustly handle different telemetry event shapes
+                            handle_telemetry_event(pdata)
                         else:
-                            logger.debug("Unhandled WS event: %s", ev)
+                            # fallback: if data looks like telemetry, try to apply
+                            if isinstance(pdata, dict) and ("position" in pdata or "battery_level_pct" in pdata):
+                                # attempt to find rover_id field
+                                if "rover_id" in pdata:
+                                    apply_telemetry(pdata["rover_id"], pdata)
+                                else:
+                                    logger.debug("Received telemetry-like payload without explicit event: %s", pdata.keys())
+                            else:
+                                logger.debug("Unhandled WS event: %s", ev)
+                    except Exception:
+                        # Log full exception but do not exit; keep connected and continue processing
+                        logger.exception("Error processing WS message; ignoring and continuing")
+                        continue
         except Exception as e:
             # Handle ConnectionRefused gracefully with longer backoff and no traceback spam
             if isinstance(e, ConnectionRefusedError) or "ConnectionRefusedError" in repr(e):

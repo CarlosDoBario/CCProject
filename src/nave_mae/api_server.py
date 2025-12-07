@@ -15,6 +15,7 @@ import logging
 import threading
 import sys
 import time
+import traceback
 from typing import Dict, Any, List, Optional, Callable, TYPE_CHECKING
 
 from common import config, utils
@@ -59,8 +60,8 @@ else:
 mission_store: Optional[MissionStore] = None
 telemetry_store: Optional[TelemetryStore] = None
 
-# Backwards-compatible event queue (kept for code that consumes it)
-event_queue: asyncio.Queue = asyncio.Queue()
+# Backwards-compatible event queue (initialized on startup to bind to the api event loop)
+event_queue: Optional[asyncio.Queue] = None
 
 # Active WebSocket connections (forward reference so static checkers are happy)
 active_connections: List["WebSocket"] = []  # type: ignore
@@ -80,20 +81,40 @@ def setup_stores(ms: MissionStore, ts: TelemetryStore):
 if _FASTAPI_AVAILABLE:
     @app.on_event("startup")
     async def _api_on_startup():
-        global api_loop
+        global api_loop, event_queue
         api_loop = asyncio.get_running_loop()
-        logger.info("API startup complete — api_loop captured")
+        # initialize event_queue here so it is bound to the running loop
+        event_queue = asyncio.Queue()
+        logger.info("API startup complete — api_loop captured and event_queue initialized")
+
+
+# Helper: robust JSON serialization (fall back to str for unknown types)
+def _json_dumps_safe(obj: Any) -> str:
+    try:
+        return json.dumps(obj)
+    except Exception:
+        try:
+            return json.dumps(obj, default=str)
+        except Exception:
+            try:
+                return json.dumps({"error": "serialization_failed", "repr": repr(obj)})
+            except Exception:
+                return '{"error":"serialization_failed","repr":"<unserializable>"}'
 
 
 # Safe non-blocking send helper
-async def _safe_send(ws, event: Dict[str, Any]):
+async def _safe_send(ws, event: Dict[str, Any]) -> bool:
     try:
-        await ws.send_json(event)
+        payload = _json_dumps_safe(event)
+        await ws.send_text(payload)
+        return True
     except Exception:
+        traceback.print_exc()
         try:
-            logger.debug("Failed to send event to websocket client (ignored)")
+            logger.exception("Failed to send event to websocket client")
         except Exception:
             pass
+        return False
 
 
 # ----------------------------------------
@@ -178,9 +199,13 @@ async def broadcast_hook(event_type: str, payload: Dict[str, Any]):
         "data": payload
     }
 
-    # 1) enqueue
+    # 1) enqueue (only if event_queue initialized)
+    global event_queue
     try:
-        await event_queue.put(normalized_event)
+        if event_queue is not None:
+            await event_queue.put(normalized_event)
+        else:
+            logger.debug("broadcast_hook: event_queue not initialized; skipping enqueue")
     except Exception:
         logger.exception("Failed to put event into event_queue")
 
@@ -212,7 +237,10 @@ async def broadcast_hook(event_type: str, payload: Dict[str, Any]):
             }
 
             try:
-                await event_queue.put(telemetry_update_event)
+                if event_queue is not None:
+                    await event_queue.put(telemetry_update_event)
+                else:
+                    logger.debug("broadcast_hook: event_queue not initialized; skipping TELEMETRY_UPDATE enqueue")
             except Exception:
                 logger.exception("Failed to put TELEMETRY_UPDATE into event_queue")
 
@@ -280,7 +308,7 @@ if _FASTAPI_AVAILABLE:
         """
         await websocket.accept()
         active_connections.append(websocket)
-        logger.info("Novo Ground Control client conectado via WebSocket (%d ativos)", len(active_connections))
+        logger.info("Novo Ground Control cliente conectado via WebSocket (%d ativos)", len(active_connections))
 
         # Send combined snapshot (missions + latest telemetry)
         try:
@@ -298,14 +326,19 @@ if _FASTAPI_AVAILABLE:
                     logger.exception("Falha a recolher telemetria do TelemetryStore para snapshot inicial")
 
                 combined_snapshot = {"missions": missions_part or {}, "rovers": rovers_part}
-                await websocket.send_json({"event": "MISSION_SNAPSHOT", "data": combined_snapshot})
+                ok = await _safe_send(websocket, {"event": "MISSION_SNAPSHOT", "data": combined_snapshot})
+                if not ok:
+                    logger.warning("Failed to deliver initial MISSION_SNAPSHOT (client might disconnect)")
 
                 # Send immediate TELEMETRY_UPDATE events for clients to apply
                 try:
                     for rid, latest in rovers_part.items():
                         evt = {"event": "TELEMETRY_UPDATE", "data": latest}
-                        await websocket.send_json(evt)
-                        logger.debug("Sent initial TELEMETRY_UPDATE for %s to websocket client", rid)
+                        ok = await _safe_send(websocket, evt)
+                        if ok:
+                            logger.debug("Sent initial TELEMETRY_UPDATE for %s to websocket client", rid)
+                        else:
+                            logger.warning("Failed to send initial TELEMETRY_UPDATE for %s", rid)
                 except Exception:
                     logger.exception("Falha ao enviar TELEMETRY_UPDATE iniciais ao cliente WebSocket")
 
@@ -321,23 +354,37 @@ if _FASTAPI_AVAILABLE:
                     # Re-send updates (idempotent/harmless)
                     for rid, latest in rovers_after.items():
                         evt = {"event": "TELEMETRY_UPDATE", "data": latest}
-                        await websocket.send_json(evt)
-                        logger.debug("Re-sent TELEMETRY_UPDATE for %s after short delay", rid)
+                        ok = await _safe_send(websocket, evt)
+                        if ok:
+                            logger.debug("Re-sent TELEMETRY_UPDATE for %s after short delay", rid)
+                        else:
+                            logger.warning("Failed to re-send TELEMETRY_UPDATE for %s", rid)
                 except Exception:
                     logger.exception("Falha ao reenviar TELEMETRY_UPDATE pós-snapshot")
         except Exception:
-            logger.warning("Falha ao enviar snapshot inicial.")
+            # improved logging for the outer try so we capture full traceback
+            logger.exception("Falha ao enviar snapshot inicial.")
 
         # Main loop: forward events from event_queue to this websocket client
         while True:
             try:
+                # Ensure event_queue is available (should be initialized on startup)
+                global event_queue
+                if event_queue is None:
+                    # graceful sleep and continue if queue not ready
+                    await asyncio.sleep(0.2)
+                    continue
+
                 event = await asyncio.wait_for(event_queue.get(), timeout=30)
                 try:
                     logger.debug("Sending event to websocket client: %s", event.get("event"))
                 except Exception:
                     pass
-                await websocket.send_json(event)
+                sent = await _safe_send(websocket, event)
                 event_queue.task_done()
+                if not sent:
+                    logger.warning("Send to websocket client failed; breaking out of forward loop")
+                    break
             except asyncio.TimeoutError:
                 # keepalive ping
                 try:
@@ -347,12 +394,14 @@ if _FASTAPI_AVAILABLE:
             except WebSocketDisconnect:
                 break
             except Exception:
-                logger.warning("Erro de WebSocket durante o envio; desconectando cliente.")
+                # log full exception here for easier debugging
+                logger.exception("Erro de WebSocket durante o envio; desconectando cliente.")
                 break
 
         # Cleanup
         try:
-            active_connections.remove(websocket)
+            if websocket in active_connections:
+                active_connections.remove(websocket)
         except Exception:
             pass
         logger.info("Ground Control client desconectado (%d ativos)", len(active_connections))
