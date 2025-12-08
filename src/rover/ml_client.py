@@ -168,7 +168,8 @@ class SimpleMLClient(asyncio.DatagramProtocol):
 
     async def start(self):
         loop = asyncio.get_event_loop()
-        transport, protocol = await loop.create_datagram_endpoint(lambda: self, local_addr=('127.0.0.1', 0), family=socket.AF_INET)
+        # Bind to 0.0.0.0 for the client socket so replies on loopback are accepted reliably
+        transport, protocol = await loop.create_datagram_endpoint(lambda: self, local_addr=('0.0.0.0', 0), family=socket.AF_INET)
         self.transport = transport
         await self.request_mission()
         asyncio.create_task(self.retransmit_loop())
@@ -228,7 +229,7 @@ class SimpleMLClient(asyncio.DatagramProtocol):
     def _resend_persisted_packets(self, addr: Tuple[str, int]):
         """
         Read persisted packets from ML_CLIENT_CACHE_DIR and resend them to addr.
-        Filename convention: "<rover_id>-<msgid>.bin"
+        Filename convention: "<rover_id>-*.bin"
         Records mapping msgid -> Path so file can be removed when ACK arrives.
         """
         if not self.cache_dir:

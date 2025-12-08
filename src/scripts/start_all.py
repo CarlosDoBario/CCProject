@@ -3,25 +3,66 @@
 start_all.py - arranca TelemetryServer + API (uvicorn) no mesmo event loop.
 
 Uso:
-  $env:PYTHONPATH="src"; python src\scripts\start_all.py
+  $env:PYTHONPATH="src"; python src/scripts/start_all.py [--create-demo]
+
+Opções:
+  --create-demo    cria missões demo no MissionStore após arrancar os serviços
 """
 import asyncio
 import time
 import signal
 import sys
+import argparse
 from common import config as cfg, utils
+from nave_mae.ml_server import MLServerProtocol
 from nave_mae import api_server
 from nave_mae.telemetry_launcher import start_telemetry_server
 
 logger = utils.get_logger("start_all")
 
-async def main():
+async def main(create_demo: bool = False):
     # 1) Arranca o TelemetryServer (assíncrono)
     services = await start_telemetry_server(host=cfg.TELEMETRY_HOST, port=cfg.TELEMETRY_PORT)
     ms = services["ms"]
     ts = services["ts"]
     srv = services["telemetry_server"]
     logger.info("TelemetryServer started: %s", srv)
+
+    # Opcional: criar missões demo se solicitado (ou se o store estiver vazio)
+    try:
+        if create_demo:
+            # use the helper if available
+            try:
+                ms.create_demo_missions()
+                logger.info("Demo missions created in MissionStore")
+            except Exception:
+                # fallback: create a single demo mission
+                try:
+                    ms.create_mission({
+                        "mission_id": f"M-DEMO-{int(time.time())}",
+                        "task": "collect_samples",
+                        "params": {"sample_count": 3},
+                        "priority": 1
+                    })
+                    logger.info("Single demo mission created in MissionStore")
+                except Exception:
+                    logger.exception("Failed to create demo mission(s)")
+    except Exception:
+        logger.exception("Error while creating demo missions (continuing)")
+
+    # 1.5) ARRANCAR O ML SERVER (UDP)
+    try:
+        loop = asyncio.get_event_loop()
+        ml_transport, ml_protocol = await loop.create_datagram_endpoint(
+            lambda: MLServerProtocol(mission_store=ms),
+            local_addr=(cfg.ML_HOST, cfg.ML_UDP_PORT)
+        )
+        logger.info("ML Server (UDP) started on %s:%d", cfg.ML_HOST, cfg.ML_UDP_PORT)
+        services["ml_transport"] = ml_transport
+        services["ml_protocol"] = ml_protocol
+    except Exception:
+        logger.exception("Falha ao arrancar o ML Server")
+        raise
 
     # 2) Injeta os stores no módulo api_server (mesma memória/processo)
     api_server.setup_stores(ms, ts)
@@ -83,8 +124,22 @@ async def main():
         except Exception:
             pass
 
+    # Stop ML transport if present
+    try:
+        ml_proto = services.get("ml_protocol")
+        if ml_proto and hasattr(ml_proto, "stop"):
+            await ml_proto.stop(wait_timeout=2.0)
+        ml_transport = services.get("ml_transport")
+        if ml_transport:
+            ml_transport.close()
+    except Exception:
+        logger.exception("Error stopping ML server")
+
     logger.info("Shutdown complete")
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    parser = argparse.ArgumentParser(description="Start TelemetryServer + API + optional ML demo missions")
+    parser.add_argument("--create-demo", action="store_true", help="Create demo missions in MissionStore on startup")
+    args = parser.parse_args()
+    asyncio.run(main(create_demo=args.create_demo))
