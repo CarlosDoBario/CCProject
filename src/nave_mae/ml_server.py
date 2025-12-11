@@ -179,6 +179,8 @@ class MLServerProtocol(asyncio.DatagramProtocol):
                         self.mission_store.register_rover(rover_id, addr)
                     except Exception:
                         self.mission_store.register_rover(rover_id)
+                except Exception:
+                    logger.exception("mission_store.register_rover failed (continuing)")
         except Exception:
             logger.exception("mission_store.register_rover failed (continuing)")
 
@@ -262,9 +264,9 @@ class MLServerProtocol(asyncio.DatagramProtocol):
                     msgid=0,
                 )
              if self.transport:
-                self.transport.sendto(ack_pkt_req, addr)
-                self.last_acks[msgid] = ack_pkt_req
-                logger.debug("Sent ACK for REQUEST_MISSION msgid=%s", msgid)
+                 self.transport.sendto(ack_pkt_req, addr)
+                 self.last_acks[msgid] = ack_pkt_req
+                 logger.debug("Sent ACK for REQUEST_MISSION msgid=%s", msgid)
         except Exception:
             logger.exception("Failed to send ACK for REQUEST_MISSION")
 
@@ -313,7 +315,7 @@ class MLServerProtocol(asyncio.DatagramProtocol):
     def _handle_progress(self, rover_id: str, canonical: Dict[str, Any], addr: Tuple[str, int]):
         mission_id = canonical.get("mission_id")
         
-        # Log da informação detalhada recebida (inclui temperatura/velocidade do TLV_PARAMS_JSON)
+        # Extração de variáveis da telemetria canónica (resultante do parsing TLV/JSON)
         progress_pct = canonical.get("progress_pct", 0.0)
         status = canonical.get("status", "N/A")
         temp = canonical.get("internal_temp_c", 0.0)
@@ -324,22 +326,20 @@ class MLServerProtocol(asyncio.DatagramProtocol):
         logger.info(f"Progress from {rover_id} on mission {mission_id}: {progress_pct:.1f}%% (Status: {status}, Temp: {temp:.1f}°C, Speed: {speed:.1f}m/s)")
 
         try:
-            if mission_id:
-                self.mission_store.update_progress(mission_id, rover_id, canonical)
-            
-            # --- CORREÇÃO CRÍTICA: Atualiza o estado detalhado do Rover no MissionStore ---
-            # O MissionStore deve ser a fonte de verdade para a API.
+            # --- CORREÇÃO CRÍTICA (REORGANIZADA): Atualiza o estado detalhado do Rover primeiro ---
+            # Deve ser feito antes de update_progress para garantir que todos os dados 
+            # do rover estão prontos para serem persistidos na chamada final de save_to_file().
             with self.mission_store._lock:
                 r = self.mission_store._rovers.setdefault(rover_id, {"rover_id": rover_id})
                 
-                # Atualiza os campos simples no nível superior para fácil acesso
+                # Atualiza os campos simples no nível superior para fácil acesso (Usados por API/rovers)
                 r["battery_level_pct"] = battery
                 r["internal_temp_c"] = temp
                 r["current_speed_m_s"] = speed
                 r["position"] = position
                 r["state"] = status # O status da telemetria é mais detalhado que o estado da missão
                 
-                # Armazena o payload completo sob uma chave para o API_Server ler
+                # Armazena o payload completo sob uma chave para o API_Server ler (last_telemetry_full)
                 r["last_telemetry_full"] = {
                     "status": status,
                     "battery_level_pct": battery,
@@ -348,10 +348,13 @@ class MLServerProtocol(asyncio.DatagramProtocol):
                     "position": position,
                     "timestamp_ms": canonical.get("timestamp_ms", utils.now_ms()),
                 }
-                
-                # Salvar para garantir que o MissionStore do disco está atualizado
-                self.mission_store.save_to_file()
+                # A chamada self.mission_store.save_to_file() foi removida daqui.
 
+            if mission_id:
+                # 2. Atualiza a Missão: Esta chamada atualiza o progresso da missão, o histórico,
+                # e faz a chamada final e única a mission_store.save_to_file() (se o mission_store for persistente)
+                self.mission_store.update_progress(mission_id, rover_id, canonical)
+            
         except Exception:
             logger.exception("mission_store update failed in ML Server")
 

@@ -284,7 +284,8 @@ class RoverSim:
                 self.samples_collected = max(1, int(self.samples_collected))
 
     def is_mission_complete(self) -> bool:
-        return self.state == "COMPLETED" or self.state in ("CHARGING_TRAVEL", "CHARGING")
+        # CORREÇÃO: Apenas o estado COMPLETED sinaliza o término da missão principal
+        return self.state == "COMPLETED"
 
     def get_telemetry(self) -> Dict[str, Any]:
         """
@@ -293,7 +294,7 @@ class RoverSim:
         The dict matches the canonical fields expected by the binary TLV packers / MissionStore:
           - mission_id, progress_pct, position, battery_level_pct, status, errors, samples_collected, timestamp_ms).
         
-        NOTE: progress_pct is removed from the canonical output as requested, and internal_temp_c / current_speed_m_s are added.
+        NOTE: progress_pct é incluído para permitir o envio do TLV de progresso.
         """
         ts_ms = int(time.time() * 1000)
 
@@ -308,7 +309,7 @@ class RoverSim:
         
         return {
             "mission_id": (self.current_mission.get("mission_id") if self.current_mission else None),
-            # "progress_pct": self.progress_pct, # Removido conforme solicitado
+            "progress_pct": self.progress_pct, 
             "position": dict(self.position),
             "battery_level_pct": round(self.battery_level_pct, 1),
             "internal_temp_c": round(self.internal_temp_c, 1), # NOVO CAMPO
