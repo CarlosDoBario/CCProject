@@ -18,483 +18,1559 @@
       "priority": 1,
       "max_duration_s": 20.0,
       "update_interval_s": 1.0,
-      "created_at": "2025-12-11T14:35:35+00:00",
+      "created_at": "2025-12-11T16:40:59+00:00",
       "state": "COMPLETED",
       "assigned_rover": "R-001",
-      "assigned_at": "2025-12-11T14:37:20+00:00",
+      "assigned_at": "2025-12-11T16:42:44+00:00",
       "history": [
         {
-          "ts": "2025-12-11T14:37:20+00:00",
+          "ts": "2025-12-11T16:42:44+00:00",
           "type": "ASSIGNED",
           "rover": "R-001"
         },
         {
-          "ts": "2025-12-11T14:37:21+00:00",
+          "ts": "2025-12-11T16:42:45+00:00",
           "type": "PROGRESS",
           "rover": "R-001",
           "payload": {
             "mission_id": "M-0001",
             "position": {
-              "x": -0.3326103985309601,
-              "y": 0.48461228609085083,
+              "x": 31.92838478088379,
+              "y": 8.098084449768066,
               "z": 0.0
             },
-            "battery_level_pct": 95.0,
-            "progress_pct": 6.670000076293945,
+            "battery_level_pct": 32.0,
+            "progress_pct": 0.0,
             "params": {
-              "internal_temp_c": 28.4,
-              "current_speed_m_s": 0.8,
-              "status": "running",
+              "internal_temp_c": 32.2,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
               "errors": [],
               "position": {
-                "x": -0.33261039594792663,
-                "y": 0.48461229989920684,
+                "x": 31.928384630780393,
+                "y": 8.09808399650891,
                 "z": 0.0
               },
-              "battery_level_pct": 95.9
+              "battery_level_pct": 32.0
             },
-            "internal_temp_c": 28.4,
-            "current_speed_m_s": 0.8,
-            "status": "running",
+            "internal_temp_c": 32.2,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
             "errors": []
           }
         },
         {
-          "ts": "2025-12-11T14:37:22+00:00",
+          "ts": "2025-12-11T16:42:46+00:00",
           "type": "PROGRESS",
           "rover": "R-001",
           "payload": {
             "mission_id": "M-0001",
             "position": {
-              "x": -0.3168063759803772,
-              "y": 0.5151627659797668,
+              "x": 31.002391815185547,
+              "y": 8.47562313079834,
               "z": 0.0
             },
-            "battery_level_pct": 95.0,
-            "progress_pct": 13.329999923706055,
+            "battery_level_pct": 31.0,
+            "progress_pct": 0.0,
             "params": {
-              "internal_temp_c": 28.6,
-              "current_speed_m_s": 0.8,
-              "status": "running",
+              "internal_temp_c": 32.4,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
               "errors": [],
               "position": {
-                "x": -0.31680636269855617,
-                "y": 0.5151627817110233,
+                "x": 31.002391054304475,
+                "y": 8.475623261122987,
                 "z": 0.0
               },
-              "battery_level_pct": 95.7
+              "battery_level_pct": 31.8
             },
-            "internal_temp_c": 28.6,
-            "current_speed_m_s": 0.8,
-            "status": "running",
+            "internal_temp_c": 32.4,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
             "errors": []
           }
         },
         {
-          "ts": "2025-12-11T14:37:23+00:00",
+          "ts": "2025-12-11T16:42:47+00:00",
           "type": "PROGRESS",
           "rover": "R-001",
           "payload": {
             "mission_id": "M-0001",
             "position": {
-              "x": -0.33292895555496216,
-              "y": 0.4956110715866089,
+              "x": 30.076396942138672,
+              "y": 8.85316276550293,
               "z": 0.0
             },
-            "battery_level_pct": 95.0,
-            "progress_pct": 20.0,
+            "battery_level_pct": 31.0,
+            "progress_pct": 0.0,
             "params": {
-              "internal_temp_c": 28.8,
-              "current_speed_m_s": 0.8,
-              "status": "running",
+              "internal_temp_c": 32.6,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
               "errors": [],
               "position": {
-                "x": -0.3329289423224163,
-                "y": 0.49561108603629833,
+                "x": 30.076397477828557,
+                "y": 8.853162525737066,
                 "z": 0.0
               },
-              "battery_level_pct": 95.6
+              "battery_level_pct": 31.6
             },
-            "internal_temp_c": 28.8,
-            "current_speed_m_s": 0.8,
-            "status": "running",
+            "internal_temp_c": 32.6,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
             "errors": []
           }
         },
         {
-          "ts": "2025-12-11T14:37:24+00:00",
+          "ts": "2025-12-11T16:42:48+00:00",
           "type": "PROGRESS",
           "rover": "R-001",
           "payload": {
             "mission_id": "M-0001",
             "position": {
-              "x": -0.3034505844116211,
-              "y": 0.4834213852882385,
+              "x": 29.15040397644043,
+              "y": 9.230701446533203,
               "z": 0.0
             },
-            "battery_level_pct": 95.0,
-            "progress_pct": 26.670000076293945,
+            "battery_level_pct": 31.0,
+            "progress_pct": 0.0,
             "params": {
-              "internal_temp_c": 29.0,
-              "current_speed_m_s": 0.8,
-              "status": "running",
+              "internal_temp_c": 32.8,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
               "errors": [],
               "position": {
-                "x": -0.3034505953806348,
-                "y": 0.48342137613118297,
+                "x": 29.15040390135264,
+                "y": 9.230701790351144,
                 "z": 0.0
               },
-              "battery_level_pct": 95.5
+              "battery_level_pct": 31.4
             },
-            "internal_temp_c": 29.0,
-            "current_speed_m_s": 0.8,
-            "status": "running",
+            "internal_temp_c": 32.8,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
             "errors": []
           }
         },
         {
-          "ts": "2025-12-11T14:37:25+00:00",
+          "ts": "2025-12-11T16:42:49+00:00",
           "type": "PROGRESS",
           "rover": "R-001",
           "payload": {
             "mission_id": "M-0001",
             "position": {
-              "x": -0.3119007349014282,
-              "y": 0.456416517496109,
+              "x": 28.224411010742188,
+              "y": 9.608241081237793,
               "z": 0.0
             },
-            "battery_level_pct": 95.0,
-            "progress_pct": 33.33000183105469,
+            "battery_level_pct": 31.0,
+            "progress_pct": 0.0,
             "params": {
-              "internal_temp_c": 29.2,
-              "current_speed_m_s": 0.8,
-              "status": "running",
+              "internal_temp_c": 33.0,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
               "errors": [],
               "position": {
-                "x": -0.3119007214642183,
-                "y": 0.45641650653483773,
+                "x": 28.22441032487672,
+                "y": 9.608241054965221,
                 "z": 0.0
               },
-              "battery_level_pct": 95.3
+              "battery_level_pct": 31.2
             },
-            "internal_temp_c": 29.2,
-            "current_speed_m_s": 0.8,
-            "status": "running",
+            "internal_temp_c": 33.0,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
             "errors": []
           }
         },
         {
-          "ts": "2025-12-11T14:37:26+00:00",
+          "ts": "2025-12-11T16:42:50+00:00",
           "type": "PROGRESS",
           "rover": "R-001",
           "payload": {
             "mission_id": "M-0001",
             "position": {
-              "x": -0.27863872051239014,
-              "y": 0.46091228723526,
+              "x": 27.298416137695312,
+              "y": 9.985780715942383,
               "z": 0.0
             },
-            "battery_level_pct": 95.0,
-            "progress_pct": 40.0,
+            "battery_level_pct": 31.0,
+            "progress_pct": 0.0,
             "params": {
-              "internal_temp_c": 29.4,
-              "current_speed_m_s": 0.8,
-              "status": "running",
+              "internal_temp_c": 33.2,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
               "errors": [],
               "position": {
-                "x": -0.27863873421648344,
-                "y": 0.46091228724414984,
+                "x": 27.298416748400804,
+                "y": 9.985780319579298,
                 "z": 0.0
               },
-              "battery_level_pct": 95.2
+              "battery_level_pct": 31.0
             },
-            "internal_temp_c": 29.4,
-            "current_speed_m_s": 0.8,
-            "status": "running",
+            "internal_temp_c": 33.2,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
             "errors": []
           }
         },
         {
-          "ts": "2025-12-11T14:37:27+00:00",
+          "ts": "2025-12-11T16:42:51+00:00",
           "type": "PROGRESS",
           "rover": "R-001",
           "payload": {
             "mission_id": "M-0001",
             "position": {
-              "x": -0.28798121213912964,
-              "y": 0.49354076385498047,
+              "x": 26.37242317199707,
+              "y": 10.363319396972656,
               "z": 0.0
             },
-            "battery_level_pct": 95.0,
-            "progress_pct": 46.66999816894531,
+            "battery_level_pct": 30.0,
+            "progress_pct": 0.0,
             "params": {
-              "internal_temp_c": 29.6,
-              "current_speed_m_s": 0.8,
-              "status": "running",
+              "internal_temp_c": 33.4,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
               "errors": [],
               "position": {
-                "x": -0.28798121279558153,
-                "y": 0.4935407752903145,
+                "x": 26.372423171924886,
+                "y": 10.363319584193377,
                 "z": 0.0
               },
-              "battery_level_pct": 95.1
+              "battery_level_pct": 30.8
             },
-            "internal_temp_c": 29.6,
-            "current_speed_m_s": 0.8,
-            "status": "running",
+            "internal_temp_c": 33.4,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
             "errors": []
           }
         },
         {
-          "ts": "2025-12-11T14:37:28+00:00",
+          "ts": "2025-12-11T16:42:52+00:00",
           "type": "PROGRESS",
           "rover": "R-001",
           "payload": {
             "mission_id": "M-0001",
             "position": {
-              "x": -0.2932918965816498,
-              "y": 0.4886009991168976,
+              "x": 25.446430206298828,
+              "y": 10.740859031677246,
               "z": 0.0
             },
-            "battery_level_pct": 94.0,
-            "progress_pct": 53.33000183105469,
+            "battery_level_pct": 30.0,
+            "progress_pct": 0.0,
             "params": {
-              "internal_temp_c": 29.8,
-              "current_speed_m_s": 0.8,
-              "status": "running",
+              "internal_temp_c": 33.6,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
               "errors": [],
               "position": {
-                "x": -0.2932919052035308,
-                "y": 0.4886010053057991,
+                "x": 25.44642959544897,
+                "y": 10.740858848807456,
                 "z": 0.0
               },
-              "battery_level_pct": 94.9
+              "battery_level_pct": 30.6
             },
-            "internal_temp_c": 29.8,
-            "current_speed_m_s": 0.8,
-            "status": "running",
+            "internal_temp_c": 33.6,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
             "errors": []
           }
         },
         {
-          "ts": "2025-12-11T14:37:29+00:00",
+          "ts": "2025-12-11T16:42:53+00:00",
           "type": "PROGRESS",
           "rover": "R-001",
           "payload": {
             "mission_id": "M-0001",
             "position": {
-              "x": -0.3255654275417328,
-              "y": 0.4790671467781067,
+              "x": 24.520435333251953,
+              "y": 11.11839771270752,
               "z": 0.0
             },
-            "battery_level_pct": 94.0,
-            "progress_pct": 60.0,
+            "battery_level_pct": 30.0,
+            "progress_pct": 0.0,
             "params": {
-              "internal_temp_c": 30.0,
-              "current_speed_m_s": 0.8,
-              "status": "running",
+              "internal_temp_c": 33.8,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
               "errors": [],
               "position": {
-                "x": -0.3255654339622389,
-                "y": 0.4790671461680762,
+                "x": 24.52043601897305,
+                "y": 11.118398113421533,
                 "z": 0.0
               },
-              "battery_level_pct": 94.8
+              "battery_level_pct": 30.4
             },
-            "internal_temp_c": 30.0,
-            "current_speed_m_s": 0.8,
-            "status": "running",
+            "internal_temp_c": 33.8,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
             "errors": []
           }
         },
         {
-          "ts": "2025-12-11T14:37:31+00:00",
+          "ts": "2025-12-11T16:42:54+00:00",
           "type": "PROGRESS",
           "rover": "R-001",
           "payload": {
             "mission_id": "M-0001",
             "position": {
-              "x": -0.3371672034263611,
-              "y": 0.4459569752216339,
+              "x": 23.59444236755371,
+              "y": 11.49593734741211,
               "z": 0.0
             },
-            "battery_level_pct": 94.0,
-            "progress_pct": 66.66999816894531,
+            "battery_level_pct": 30.0,
+            "progress_pct": 0.0,
             "params": {
-              "internal_temp_c": 30.2,
-              "current_speed_m_s": 0.8,
-              "status": "running",
+              "internal_temp_c": 34.0,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
               "errors": [],
               "position": {
-                "x": -0.33716721620781714,
-                "y": 0.4459569668989125,
+                "x": 23.594442442497133,
+                "y": 11.49593737803561,
                 "z": 0.0
               },
-              "battery_level_pct": 94.7
+              "battery_level_pct": 30.2
             },
-            "internal_temp_c": 30.2,
-            "current_speed_m_s": 0.8,
-            "status": "running",
+            "internal_temp_c": 34.0,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
             "errors": []
           }
         },
         {
-          "ts": "2025-12-11T14:37:32+00:00",
+          "ts": "2025-12-11T16:42:55+00:00",
           "type": "PROGRESS",
           "rover": "R-001",
           "payload": {
             "mission_id": "M-0001",
             "position": {
-              "x": -0.3242083787918091,
-              "y": 0.46599194407463074,
+              "x": 22.66844940185547,
+              "y": 11.8734769821167,
               "z": 0.0
             },
-            "battery_level_pct": 94.0,
-            "progress_pct": 73.33000183105469,
+            "battery_level_pct": 30.0,
+            "progress_pct": 0.0,
             "params": {
-              "internal_temp_c": 30.4,
-              "current_speed_m_s": 0.8,
-              "status": "running",
+              "internal_temp_c": 34.2,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
               "errors": [],
               "position": {
-                "x": -0.3242083722774331,
-                "y": 0.4659919438238847,
+                "x": 22.668448866021215,
+                "y": 11.873476642649688,
                 "z": 0.0
               },
-              "battery_level_pct": 94.5
+              "battery_level_pct": 30.0
             },
-            "internal_temp_c": 30.4,
-            "current_speed_m_s": 0.8,
-            "status": "running",
+            "internal_temp_c": 34.2,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
             "errors": []
           }
         },
         {
-          "ts": "2025-12-11T14:37:33+00:00",
+          "ts": "2025-12-11T16:42:56+00:00",
           "type": "PROGRESS",
           "rover": "R-001",
           "payload": {
             "mission_id": "M-0001",
             "position": {
-              "x": -0.2959006428718567,
-              "y": 0.4613420069217682,
+              "x": 21.742454528808594,
+              "y": 12.251015663146973,
               "z": 0.0
             },
-            "battery_level_pct": 94.0,
-            "progress_pct": 80.0,
+            "battery_level_pct": 29.0,
+            "progress_pct": 0.0,
             "params": {
-              "internal_temp_c": 30.6,
-              "current_speed_m_s": 0.8,
-              "status": "running",
+              "internal_temp_c": 34.4,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
               "errors": [],
               "position": {
-                "x": -0.29590063149618157,
-                "y": 0.46134201940579106,
+                "x": 21.742455289545298,
+                "y": 12.251015907263767,
                 "z": 0.0
               },
-              "battery_level_pct": 94.4
+              "battery_level_pct": 29.8
             },
-            "internal_temp_c": 30.6,
-            "current_speed_m_s": 0.8,
-            "status": "running",
+            "internal_temp_c": 34.4,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
             "errors": []
           }
         },
         {
-          "ts": "2025-12-11T14:37:34+00:00",
+          "ts": "2025-12-11T16:42:57+00:00",
           "type": "PROGRESS",
           "rover": "R-001",
           "payload": {
             "mission_id": "M-0001",
             "position": {
-              "x": -0.313446968793869,
-              "y": 0.47170934081077576,
+              "x": 20.81646156311035,
+              "y": 12.628555297851562,
               "z": 0.0
             },
-            "battery_level_pct": 94.0,
-            "progress_pct": 86.66999816894531,
+            "battery_level_pct": 29.0,
+            "progress_pct": 0.0,
             "params": {
-              "internal_temp_c": 30.8,
-              "current_speed_m_s": 0.8,
-              "status": "running",
+              "internal_temp_c": 34.6,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
               "errors": [],
               "position": {
-                "x": -0.31344697338297206,
-                "y": 0.471709339505868,
+                "x": 20.81646171306938,
+                "y": 12.628555171877844,
                 "z": 0.0
               },
-              "battery_level_pct": 94.3
+              "battery_level_pct": 29.6
             },
-            "internal_temp_c": 30.8,
-            "current_speed_m_s": 0.8,
-            "status": "running",
+            "internal_temp_c": 34.6,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
             "errors": []
           }
         },
         {
-          "ts": "2025-12-11T14:37:35+00:00",
+          "ts": "2025-12-11T16:42:58+00:00",
           "type": "PROGRESS",
           "rover": "R-001",
           "payload": {
             "mission_id": "M-0001",
             "position": {
-              "x": -0.34534963965415955,
-              "y": 0.45350074768066406,
+              "x": 19.89046859741211,
+              "y": 13.006093978881836,
               "z": 0.0
             },
-            "battery_level_pct": 94.0,
-            "progress_pct": 93.33000183105469,
+            "battery_level_pct": 29.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 34.8,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 19.890468136593462,
+                "y": 13.006094436491923,
+                "z": 0.0
+              },
+              "battery_level_pct": 29.4
+            },
+            "internal_temp_c": 34.8,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T16:42:59+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0001",
+            "position": {
+              "x": 18.964473724365234,
+              "y": 13.383633613586426,
+              "z": 0.0
+            },
+            "battery_level_pct": 29.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 35.0,
+              "current_speed_m_s": 0.0,
+              "status": "cooling_down",
+              "errors": [
+                {
+                  "code": "TEMP-OVERHEAT",
+                  "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+                }
+              ],
+              "position": {
+                "x": 18.964474560117544,
+                "y": 13.383633701106,
+                "z": 0.0
+              },
+              "battery_level_pct": 29.2
+            },
+            "internal_temp_c": 35.0,
+            "current_speed_m_s": 0.0,
+            "status": "cooling_down",
+            "errors": [
+              {
+                "code": "TEMP-OVERHEAT",
+                "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+              }
+            ]
+          }
+        },
+        {
+          "ts": "2025-12-11T16:43:00+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0001",
+            "position": {
+              "x": 18.964473724365234,
+              "y": 13.383633613586426,
+              "z": 0.0
+            },
+            "battery_level_pct": 29.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 34.0,
+              "current_speed_m_s": 0.0,
+              "status": "cooling_down",
+              "errors": [
+                {
+                  "code": "TEMP-OVERHEAT",
+                  "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+                }
+              ],
+              "position": {
+                "x": 18.964474560117544,
+                "y": 13.383633701106,
+                "z": 0.0
+              },
+              "battery_level_pct": 29.2
+            },
+            "internal_temp_c": 34.0,
+            "current_speed_m_s": 0.0,
+            "status": "cooling_down",
+            "errors": [
+              {
+                "code": "TEMP-OVERHEAT",
+                "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+              }
+            ]
+          }
+        },
+        {
+          "ts": "2025-12-11T16:43:01+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0001",
+            "position": {
+              "x": 18.964473724365234,
+              "y": 13.383633613586426,
+              "z": 0.0
+            },
+            "battery_level_pct": 29.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 33.0,
+              "current_speed_m_s": 0.0,
+              "status": "cooling_down",
+              "errors": [
+                {
+                  "code": "TEMP-OVERHEAT",
+                  "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+                }
+              ],
+              "position": {
+                "x": 18.964474560117544,
+                "y": 13.383633701106,
+                "z": 0.0
+              },
+              "battery_level_pct": 29.2
+            },
+            "internal_temp_c": 33.0,
+            "current_speed_m_s": 0.0,
+            "status": "cooling_down",
+            "errors": [
+              {
+                "code": "TEMP-OVERHEAT",
+                "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+              }
+            ]
+          }
+        },
+        {
+          "ts": "2025-12-11T16:43:02+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0001",
+            "position": {
+              "x": 18.964473724365234,
+              "y": 13.383633613586426,
+              "z": 0.0
+            },
+            "battery_level_pct": 29.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 32.0,
+              "current_speed_m_s": 0.0,
+              "status": "cooling_down",
+              "errors": [
+                {
+                  "code": "TEMP-OVERHEAT",
+                  "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+                }
+              ],
+              "position": {
+                "x": 18.964474560117544,
+                "y": 13.383633701106,
+                "z": 0.0
+              },
+              "battery_level_pct": 29.2
+            },
+            "internal_temp_c": 32.0,
+            "current_speed_m_s": 0.0,
+            "status": "cooling_down",
+            "errors": [
+              {
+                "code": "TEMP-OVERHEAT",
+                "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+              }
+            ]
+          }
+        },
+        {
+          "ts": "2025-12-11T16:43:03+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0001",
+            "position": {
+              "x": 18.964473724365234,
+              "y": 13.383633613586426,
+              "z": 0.0
+            },
+            "battery_level_pct": 29.0,
+            "progress_pct": 0.0,
             "params": {
               "internal_temp_c": 31.0,
-              "current_speed_m_s": 0.8,
-              "status": "running",
-              "errors": [],
+              "current_speed_m_s": 0.0,
+              "status": "cooling_down",
+              "errors": [
+                {
+                  "code": "TEMP-OVERHEAT",
+                  "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+                }
+              ],
               "position": {
-                "x": -0.34534963451579137,
-                "y": 0.4535007499361584,
+                "x": 18.964474560117544,
+                "y": 13.383633701106,
                 "z": 0.0
               },
-              "battery_level_pct": 94.1
+              "battery_level_pct": 29.2
             },
             "internal_temp_c": 31.0,
-            "current_speed_m_s": 0.8,
-            "status": "running",
-            "errors": []
+            "current_speed_m_s": 0.0,
+            "status": "cooling_down",
+            "errors": [
+              {
+                "code": "TEMP-OVERHEAT",
+                "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+              }
+            ]
           }
         },
         {
-          "ts": "2025-12-11T14:37:36+00:00",
+          "ts": "2025-12-11T16:43:04+00:00",
           "type": "PROGRESS",
           "rover": "R-001",
           "payload": {
             "mission_id": "M-0001",
             "position": {
-              "x": -0.346560537815094,
-              "y": 0.4687039256095886,
+              "x": 18.964473724365234,
+              "y": 13.383633613586426,
               "z": 0.0
             },
-            "battery_level_pct": 94.0,
-            "progress_pct": 100.0,
+            "battery_level_pct": 29.0,
+            "progress_pct": 0.0,
             "params": {
-              "internal_temp_c": 31.2,
+              "internal_temp_c": 30.0,
               "current_speed_m_s": 0.0,
-              "status": "completed",
-              "errors": [],
+              "status": "cooling_down",
+              "errors": [
+                {
+                  "code": "TEMP-OVERHEAT",
+                  "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+                }
+              ],
               "position": {
-                "x": -0.34656053054054303,
-                "y": 0.4687039216886581,
+                "x": 18.964474560117544,
+                "y": 13.383633701106,
                 "z": 0.0
               },
-              "battery_level_pct": 94.0
+              "battery_level_pct": 29.2
             },
-            "internal_temp_c": 31.2,
+            "internal_temp_c": 30.0,
             "current_speed_m_s": 0.0,
-            "status": "completed",
-            "errors": []
+            "status": "cooling_down",
+            "errors": [
+              {
+                "code": "TEMP-OVERHEAT",
+                "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+              }
+            ]
           }
         },
         {
-          "ts": "2025-12-11T14:37:36+00:00",
+          "ts": "2025-12-11T16:43:05+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0001",
+            "position": {
+              "x": 18.964473724365234,
+              "y": 13.383633613586426,
+              "z": 0.0
+            },
+            "battery_level_pct": 29.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 29.0,
+              "current_speed_m_s": 0.0,
+              "status": "cooling_down",
+              "errors": [
+                {
+                  "code": "TEMP-OVERHEAT",
+                  "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+                }
+              ],
+              "position": {
+                "x": 18.964474560117544,
+                "y": 13.383633701106,
+                "z": 0.0
+              },
+              "battery_level_pct": 29.2
+            },
+            "internal_temp_c": 29.0,
+            "current_speed_m_s": 0.0,
+            "status": "cooling_down",
+            "errors": [
+              {
+                "code": "TEMP-OVERHEAT",
+                "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+              }
+            ]
+          }
+        },
+        {
+          "ts": "2025-12-11T16:43:06+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0001",
+            "position": {
+              "x": 18.964473724365234,
+              "y": 13.383633613586426,
+              "z": 0.0
+            },
+            "battery_level_pct": 29.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 28.0,
+              "current_speed_m_s": 0.0,
+              "status": "cooling_down",
+              "errors": [
+                {
+                  "code": "TEMP-OVERHEAT",
+                  "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+                }
+              ],
+              "position": {
+                "x": 18.964474560117544,
+                "y": 13.383633701106,
+                "z": 0.0
+              },
+              "battery_level_pct": 29.2
+            },
+            "internal_temp_c": 28.0,
+            "current_speed_m_s": 0.0,
+            "status": "cooling_down",
+            "errors": [
+              {
+                "code": "TEMP-OVERHEAT",
+                "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+              }
+            ]
+          }
+        },
+        {
+          "ts": "2025-12-11T16:43:07+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0001",
+            "position": {
+              "x": 18.964473724365234,
+              "y": 13.383633613586426,
+              "z": 0.0
+            },
+            "battery_level_pct": 29.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 27.0,
+              "current_speed_m_s": 0.0,
+              "status": "cooling_down",
+              "errors": [
+                {
+                  "code": "TEMP-OVERHEAT",
+                  "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+                }
+              ],
+              "position": {
+                "x": 18.964474560117544,
+                "y": 13.383633701106,
+                "z": 0.0
+              },
+              "battery_level_pct": 29.2
+            },
+            "internal_temp_c": 27.0,
+            "current_speed_m_s": 0.0,
+            "status": "cooling_down",
+            "errors": [
+              {
+                "code": "TEMP-OVERHEAT",
+                "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+              }
+            ]
+          }
+        },
+        {
+          "ts": "2025-12-11T16:43:08+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0001",
+            "position": {
+              "x": 18.964473724365234,
+              "y": 13.383633613586426,
+              "z": 0.0
+            },
+            "battery_level_pct": 29.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 26.0,
+              "current_speed_m_s": 0.0,
+              "status": "cooling_down",
+              "errors": [
+                {
+                  "code": "TEMP-OVERHEAT",
+                  "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+                }
+              ],
+              "position": {
+                "x": 18.964474560117544,
+                "y": 13.383633701106,
+                "z": 0.0
+              },
+              "battery_level_pct": 29.2
+            },
+            "internal_temp_c": 26.0,
+            "current_speed_m_s": 0.0,
+            "status": "cooling_down",
+            "errors": [
+              {
+                "code": "TEMP-OVERHEAT",
+                "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+              }
+            ]
+          }
+        },
+        {
+          "ts": "2025-12-11T16:43:09+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0001",
+            "position": {
+              "x": 18.964473724365234,
+              "y": 13.383633613586426,
+              "z": 0.0
+            },
+            "battery_level_pct": 29.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 25.0,
+              "current_speed_m_s": 0.0,
+              "status": "cooling_down",
+              "errors": [
+                {
+                  "code": "TEMP-OVERHEAT",
+                  "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+                }
+              ],
+              "position": {
+                "x": 18.964474560117544,
+                "y": 13.383633701106,
+                "z": 0.0
+              },
+              "battery_level_pct": 29.2
+            },
+            "internal_temp_c": 25.0,
+            "current_speed_m_s": 0.0,
+            "status": "cooling_down",
+            "errors": [
+              {
+                "code": "TEMP-OVERHEAT",
+                "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+              }
+            ]
+          }
+        },
+        {
+          "ts": "2025-12-11T16:43:10+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0001",
+            "position": {
+              "x": 18.964473724365234,
+              "y": 13.383633613586426,
+              "z": 0.0
+            },
+            "battery_level_pct": 29.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 25.0,
+              "current_speed_m_s": 0.0,
+              "status": "running",
+              "errors": [
+                {
+                  "code": "TEMP-OVERHEAT",
+                  "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+                }
+              ],
+              "position": {
+                "x": 18.964474560117544,
+                "y": 13.383633701106,
+                "z": 0.0
+              },
+              "battery_level_pct": 29.2
+            },
+            "internal_temp_c": 25.0,
+            "current_speed_m_s": 0.0,
+            "status": "running",
+            "errors": [
+              {
+                "code": "TEMP-OVERHEAT",
+                "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+              }
+            ]
+          }
+        },
+        {
+          "ts": "2025-12-11T16:43:11+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0001",
+            "position": {
+              "x": 18.956954956054688,
+              "y": 13.379535675048828,
+              "z": 0.0
+            },
+            "battery_level_pct": 29.0,
+            "progress_pct": 6.670000076293945,
+            "params": {
+              "internal_temp_c": 25.2,
+              "current_speed_m_s": 0.8,
+              "status": "running",
+              "errors": [
+                {
+                  "code": "TEMP-OVERHEAT",
+                  "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+                }
+              ],
+              "position": {
+                "x": 18.956955577009584,
+                "y": 13.379535266405336,
+                "z": 0.0
+              },
+              "battery_level_pct": 29.1
+            },
+            "internal_temp_c": 25.2,
+            "current_speed_m_s": 0.8,
+            "status": "running",
+            "errors": [
+              {
+                "code": "TEMP-OVERHEAT",
+                "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+              }
+            ]
+          }
+        },
+        {
+          "ts": "2025-12-11T16:43:12+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0001",
+            "position": {
+              "x": 18.945926666259766,
+              "y": 13.378896713256836,
+              "z": 0.0
+            },
+            "battery_level_pct": 28.0,
+            "progress_pct": 13.329999923706055,
+            "params": {
+              "internal_temp_c": 25.4,
+              "current_speed_m_s": 0.8,
+              "status": "running",
+              "errors": [
+                {
+                  "code": "TEMP-OVERHEAT",
+                  "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+                }
+              ],
+              "position": {
+                "x": 18.945926217858904,
+                "y": 13.378896966377253,
+                "z": 0.0
+              },
+              "battery_level_pct": 28.9
+            },
+            "internal_temp_c": 25.4,
+            "current_speed_m_s": 0.8,
+            "status": "running",
+            "errors": [
+              {
+                "code": "TEMP-OVERHEAT",
+                "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+              }
+            ]
+          }
+        },
+        {
+          "ts": "2025-12-11T16:43:13+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0001",
+            "position": {
+              "x": 18.922399520874023,
+              "y": 13.390244483947754,
+              "z": 0.0
+            },
+            "battery_level_pct": 28.0,
+            "progress_pct": 20.0,
+            "params": {
+              "internal_temp_c": 25.6,
+              "current_speed_m_s": 0.8,
+              "status": "running",
+              "errors": [
+                {
+                  "code": "TEMP-OVERHEAT",
+                  "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+                }
+              ],
+              "position": {
+                "x": 18.922399467887345,
+                "y": 13.390244064353105,
+                "z": 0.0
+              },
+              "battery_level_pct": 28.8
+            },
+            "internal_temp_c": 25.6,
+            "current_speed_m_s": 0.8,
+            "status": "running",
+            "errors": [
+              {
+                "code": "TEMP-OVERHEAT",
+                "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+              }
+            ]
+          }
+        },
+        {
+          "ts": "2025-12-11T16:43:14+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0001",
+            "position": {
+              "x": 18.905704498291016,
+              "y": 13.358540534973145,
+              "z": 0.0
+            },
+            "battery_level_pct": 28.0,
+            "progress_pct": 26.670000076293945,
+            "params": {
+              "internal_temp_c": 25.8,
+              "current_speed_m_s": 0.8,
+              "status": "running",
+              "errors": [
+                {
+                  "code": "TEMP-OVERHEAT",
+                  "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+                }
+              ],
+              "position": {
+                "x": 18.905703752414297,
+                "y": 13.358540971157579,
+                "z": 0.0
+              },
+              "battery_level_pct": 28.7
+            },
+            "internal_temp_c": 25.8,
+            "current_speed_m_s": 0.8,
+            "status": "running",
+            "errors": [
+              {
+                "code": "TEMP-OVERHEAT",
+                "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+              }
+            ]
+          }
+        },
+        {
+          "ts": "2025-12-11T16:43:15+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0001",
+            "position": {
+              "x": 18.920305252075195,
+              "y": 13.37096118927002,
+              "z": 0.0
+            },
+            "battery_level_pct": 28.0,
+            "progress_pct": 33.33000183105469,
+            "params": {
+              "internal_temp_c": 26.0,
+              "current_speed_m_s": 0.8,
+              "status": "running",
+              "errors": [
+                {
+                  "code": "TEMP-OVERHEAT",
+                  "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+                }
+              ],
+              "position": {
+                "x": 18.920304306228307,
+                "y": 13.370960792264173,
+                "z": 0.0
+              },
+              "battery_level_pct": 28.5
+            },
+            "internal_temp_c": 26.0,
+            "current_speed_m_s": 0.8,
+            "status": "running",
+            "errors": [
+              {
+                "code": "TEMP-OVERHEAT",
+                "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+              }
+            ]
+          }
+        },
+        {
+          "ts": "2025-12-11T16:43:16+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0001",
+            "position": {
+              "x": 18.89906883239746,
+              "y": 13.355159759521484,
+              "z": 0.0
+            },
+            "battery_level_pct": 28.0,
+            "progress_pct": 40.0,
+            "params": {
+              "internal_temp_c": 26.2,
+              "current_speed_m_s": 0.8,
+              "status": "running",
+              "errors": [
+                {
+                  "code": "TEMP-OVERHEAT",
+                  "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+                }
+              ],
+              "position": {
+                "x": 18.899068168819937,
+                "y": 13.355159940394156,
+                "z": 0.0
+              },
+              "battery_level_pct": 28.4
+            },
+            "internal_temp_c": 26.2,
+            "current_speed_m_s": 0.8,
+            "status": "running",
+            "errors": [
+              {
+                "code": "TEMP-OVERHEAT",
+                "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+              }
+            ]
+          }
+        },
+        {
+          "ts": "2025-12-11T16:43:17+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0001",
+            "position": {
+              "x": 18.931259155273438,
+              "y": 13.346199989318848,
+              "z": 0.0
+            },
+            "battery_level_pct": 28.0,
+            "progress_pct": 46.66999816894531,
+            "params": {
+              "internal_temp_c": 26.4,
+              "current_speed_m_s": 0.8,
+              "status": "running",
+              "errors": [
+                {
+                  "code": "TEMP-OVERHEAT",
+                  "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+                }
+              ],
+              "position": {
+                "x": 18.931259055035582,
+                "y": 13.346200409763094,
+                "z": 0.0
+              },
+              "battery_level_pct": 28.3
+            },
+            "internal_temp_c": 26.4,
+            "current_speed_m_s": 0.8,
+            "status": "running",
+            "errors": [
+              {
+                "code": "TEMP-OVERHEAT",
+                "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+              }
+            ]
+          }
+        },
+        {
+          "ts": "2025-12-11T16:43:18+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0001",
+            "position": {
+              "x": 18.924848556518555,
+              "y": 13.346016883850098,
+              "z": 0.0
+            },
+            "battery_level_pct": 28.0,
+            "progress_pct": 53.33000183105469,
+            "params": {
+              "internal_temp_c": 26.6,
+              "current_speed_m_s": 0.8,
+              "status": "running",
+              "errors": [
+                {
+                  "code": "TEMP-OVERHEAT",
+                  "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+                }
+              ],
+              "position": {
+                "x": 18.924849165549062,
+                "y": 13.346016757486396,
+                "z": 0.0
+              },
+              "battery_level_pct": 28.1
+            },
+            "internal_temp_c": 26.6,
+            "current_speed_m_s": 0.8,
+            "status": "running",
+            "errors": [
+              {
+                "code": "TEMP-OVERHEAT",
+                "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+              }
+            ]
+          }
+        },
+        {
+          "ts": "2025-12-11T16:43:19+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0001",
+            "position": {
+              "x": 18.907278060913086,
+              "y": 13.325732231140137,
+              "z": 0.0
+            },
+            "battery_level_pct": 28.0,
+            "progress_pct": 60.0,
+            "params": {
+              "internal_temp_c": 26.8,
+              "current_speed_m_s": 0.8,
+              "status": "running",
+              "errors": [
+                {
+                  "code": "TEMP-OVERHEAT",
+                  "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+                }
+              ],
+              "position": {
+                "x": 18.90727871410418,
+                "y": 13.325732507880359,
+                "z": 0.0
+              },
+              "battery_level_pct": 28.0
+            },
+            "internal_temp_c": 26.8,
+            "current_speed_m_s": 0.8,
+            "status": "running",
+            "errors": [
+              {
+                "code": "TEMP-OVERHEAT",
+                "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+              }
+            ]
+          }
+        },
+        {
+          "ts": "2025-12-11T16:43:20+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0001",
+            "position": {
+              "x": 18.921733856201172,
+              "y": 13.304082870483398,
+              "z": 0.0
+            },
+            "battery_level_pct": 27.0,
+            "progress_pct": 66.66999816894531,
+            "params": {
+              "internal_temp_c": 27.0,
+              "current_speed_m_s": 0.8,
+              "status": "running",
+              "errors": [
+                {
+                  "code": "TEMP-OVERHEAT",
+                  "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+                }
+              ],
+              "position": {
+                "x": 18.921734450982555,
+                "y": 13.304082686692423,
+                "z": 0.0
+              },
+              "battery_level_pct": 27.9
+            },
+            "internal_temp_c": 27.0,
+            "current_speed_m_s": 0.8,
+            "status": "running",
+            "errors": [
+              {
+                "code": "TEMP-OVERHEAT",
+                "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+              }
+            ]
+          }
+        },
+        {
+          "ts": "2025-12-11T16:43:21+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0001",
+            "position": {
+              "x": 18.941394805908203,
+              "y": 13.285603523254395,
+              "z": 0.0
+            },
+            "battery_level_pct": 27.0,
+            "progress_pct": 73.33000183105469,
+            "params": {
+              "internal_temp_c": 27.2,
+              "current_speed_m_s": 0.8,
+              "status": "running",
+              "errors": [
+                {
+                  "code": "TEMP-OVERHEAT",
+                  "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+                }
+              ],
+              "position": {
+                "x": 18.941395367751806,
+                "y": 13.285603159827609,
+                "z": 0.0
+              },
+              "battery_level_pct": 27.7
+            },
+            "internal_temp_c": 27.2,
+            "current_speed_m_s": 0.8,
+            "status": "running",
+            "errors": [
+              {
+                "code": "TEMP-OVERHEAT",
+                "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+              }
+            ]
+          }
+        },
+        {
+          "ts": "2025-12-11T16:43:22+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0001",
+            "position": {
+              "x": 18.930612564086914,
+              "y": 13.300138473510742,
+              "z": 0.0
+            },
+            "battery_level_pct": 27.0,
+            "progress_pct": 80.0,
+            "params": {
+              "internal_temp_c": 27.4,
+              "current_speed_m_s": 0.8,
+              "status": "running",
+              "errors": [
+                {
+                  "code": "TEMP-OVERHEAT",
+                  "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+                }
+              ],
+              "position": {
+                "x": 18.930612839679114,
+                "y": 13.300138409992163,
+                "z": 0.0
+              },
+              "battery_level_pct": 27.6
+            },
+            "internal_temp_c": 27.4,
+            "current_speed_m_s": 0.8,
+            "status": "running",
+            "errors": [
+              {
+                "code": "TEMP-OVERHEAT",
+                "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+              }
+            ]
+          }
+        },
+        {
+          "ts": "2025-12-11T16:43:23+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0001",
+            "position": {
+              "x": 18.93556022644043,
+              "y": 13.278640747070312,
+              "z": 0.0
+            },
+            "battery_level_pct": 27.0,
+            "progress_pct": 86.66999816894531,
+            "params": {
+              "internal_temp_c": 27.6,
+              "current_speed_m_s": 0.8,
+              "status": "running",
+              "errors": [
+                {
+                  "code": "TEMP-OVERHEAT",
+                  "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+                }
+              ],
+              "position": {
+                "x": 18.93556037810832,
+                "y": 13.278640714046404,
+                "z": 0.0
+              },
+              "battery_level_pct": 27.5
+            },
+            "internal_temp_c": 27.6,
+            "current_speed_m_s": 0.8,
+            "status": "running",
+            "errors": [
+              {
+                "code": "TEMP-OVERHEAT",
+                "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+              }
+            ]
+          }
+        },
+        {
+          "ts": "2025-12-11T16:43:24+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0001",
+            "position": {
+              "x": 18.904897689819336,
+              "y": 13.251617431640625,
+              "z": 0.0
+            },
+            "battery_level_pct": 27.0,
+            "progress_pct": 93.33000183105469,
+            "params": {
+              "internal_temp_c": 27.8,
+              "current_speed_m_s": 0.8,
+              "status": "running",
+              "errors": [
+                {
+                  "code": "TEMP-OVERHEAT",
+                  "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+                }
+              ],
+              "position": {
+                "x": 18.90489713432756,
+                "y": 13.251617404162248,
+                "z": 0.0
+              },
+              "battery_level_pct": 27.3
+            },
+            "internal_temp_c": 27.8,
+            "current_speed_m_s": 0.8,
+            "status": "running",
+            "errors": [
+              {
+                "code": "TEMP-OVERHEAT",
+                "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+              }
+            ]
+          }
+        },
+        {
+          "ts": "2025-12-11T16:43:25+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0001",
+            "position": {
+              "x": 18.907747268676758,
+              "y": 13.248854637145996,
+              "z": 0.0
+            },
+            "battery_level_pct": 27.0,
+            "progress_pct": 100.0,
+            "params": {
+              "internal_temp_c": 28.0,
+              "current_speed_m_s": 0.0,
+              "status": "completed",
+              "errors": [
+                {
+                  "code": "TEMP-OVERHEAT",
+                  "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+                }
+              ],
+              "position": {
+                "x": 18.90774640228451,
+                "y": 13.248854322129734,
+                "z": 0.0
+              },
+              "battery_level_pct": 27.2
+            },
+            "internal_temp_c": 28.0,
+            "current_speed_m_s": 0.0,
+            "status": "completed",
+            "errors": [
+              {
+                "code": "TEMP-OVERHEAT",
+                "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+              }
+            ]
+          }
+        },
+        {
+          "ts": "2025-12-11T16:43:25+00:00",
           "type": "COMPLETE",
           "rover": "R-001",
           "payload": {
@@ -509,7 +1585,7 @@
         }
       ],
       "last_progress_pct": 100.0,
-      "completed_at": "2025-12-11T14:37:36+00:00"
+      "completed_at": "2025-12-11T16:43:25+00:00"
     },
     "M-0002": {
       "mission_id": "M-0002",
@@ -529,49 +1605,638 @@
       "priority": 2,
       "max_duration_s": 15.0,
       "update_interval_s": 1.0,
-      "created_at": "2025-12-11T14:35:35+00:00",
+      "created_at": "2025-12-11T16:40:59+00:00",
       "state": "COMPLETED",
       "assigned_rover": "R-001",
-      "assigned_at": "2025-12-11T14:37:19+00:00",
+      "assigned_at": "2025-12-11T16:42:23+00:00",
       "history": [
         {
-          "ts": "2025-12-11T14:37:19+00:00",
+          "ts": "2025-12-11T16:42:23+00:00",
           "type": "ASSIGNED",
           "rover": "R-001"
         },
         {
-          "ts": "2025-12-11T14:37:20+00:00",
+          "ts": "2025-12-11T16:42:24+00:00",
           "type": "PROGRESS",
           "rover": "R-001",
           "payload": {
             "mission_id": "M-0002",
             "position": {
-              "x": -0.31775349378585815,
-              "y": 0.4738177955150604,
+              "x": 29.646087646484375,
+              "y": 28.691932678222656,
               "z": 0.0
             },
-            "battery_level_pct": 96.0,
-            "progress_pct": 100.0,
+            "battery_level_pct": 37.0,
+            "progress_pct": 0.0,
             "params": {
               "internal_temp_c": 28.2,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 29.646088357262858,
+                "y": 28.691931958408382,
+                "z": 0.0
+              },
+              "battery_level_pct": 37.8
+            },
+            "internal_temp_c": 28.2,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T16:42:25+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0002",
+            "position": {
+              "x": 29.779552459716797,
+              "y": 27.700878143310547,
+              "z": 0.0
+            },
+            "battery_level_pct": 37.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 28.4,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 29.77955326461579,
+                "y": 27.700878418731904,
+                "z": 0.0
+              },
+              "battery_level_pct": 37.6
+            },
+            "internal_temp_c": 28.4,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T16:42:26+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0002",
+            "position": {
+              "x": 29.91301727294922,
+              "y": 26.70982551574707,
+              "z": 0.0
+            },
+            "battery_level_pct": 37.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 28.6,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 29.91301817196872,
+                "y": 26.70982487905543,
+                "z": 0.0
+              },
+              "battery_level_pct": 37.4
+            },
+            "internal_temp_c": 28.6,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T16:42:27+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0002",
+            "position": {
+              "x": 30.046483993530273,
+              "y": 25.71877098083496,
+              "z": 0.0
+            },
+            "battery_level_pct": 37.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 28.8,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 30.04648307932165,
+                "y": 25.718771339378954,
+                "z": 0.0
+              },
+              "battery_level_pct": 37.2
+            },
+            "internal_temp_c": 28.8,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T16:42:28+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0002",
+            "position": {
+              "x": 30.179948806762695,
+              "y": 24.727718353271484,
+              "z": 0.0
+            },
+            "battery_level_pct": 37.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 29.0,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 30.17994798667458,
+                "y": 24.727717799702475,
+                "z": 0.0
+              },
+              "battery_level_pct": 37.0
+            },
+            "internal_temp_c": 29.0,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T16:42:29+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0002",
+            "position": {
+              "x": 30.313413619995117,
+              "y": 23.736663818359375,
+              "z": 0.0
+            },
+            "battery_level_pct": 36.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 29.2,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 30.313412894027508,
+                "y": 23.736664260025996,
+                "z": 0.0
+              },
+              "battery_level_pct": 36.8
+            },
+            "internal_temp_c": 29.2,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T16:42:30+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0002",
+            "position": {
+              "x": 30.44687843322754,
+              "y": 22.7456111907959,
+              "z": 0.0
+            },
+            "battery_level_pct": 36.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 29.4,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 30.446877801380438,
+                "y": 22.745610720349518,
+                "z": 0.0
+              },
+              "battery_level_pct": 36.6
+            },
+            "internal_temp_c": 29.4,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T16:42:31+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0002",
+            "position": {
+              "x": 30.58034324645996,
+              "y": 21.75455665588379,
+              "z": 0.0
+            },
+            "battery_level_pct": 36.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 29.6,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 30.58034270873337,
+                "y": 21.75455718067304,
+                "z": 0.0
+              },
+              "battery_level_pct": 36.4
+            },
+            "internal_temp_c": 29.6,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T16:42:32+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0002",
+            "position": {
+              "x": 30.713808059692383,
+              "y": 20.763504028320312,
+              "z": 0.0
+            },
+            "battery_level_pct": 36.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 29.8,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 30.713807616086296,
+                "y": 20.76350364099656,
+                "z": 0.0
+              },
+              "battery_level_pct": 36.2
+            },
+            "internal_temp_c": 29.8,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T16:42:33+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0002",
+            "position": {
+              "x": 30.847272872924805,
+              "y": 19.772449493408203,
+              "z": 0.0
+            },
+            "battery_level_pct": 36.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 30.0,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 30.847272523439226,
+                "y": 19.772450101320082,
+                "z": 0.0
+              },
+              "battery_level_pct": 36.0
+            },
+            "internal_temp_c": 30.0,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T16:42:34+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0002",
+            "position": {
+              "x": 30.980737686157227,
+              "y": 18.781396865844727,
+              "z": 0.0
+            },
+            "battery_level_pct": 35.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 30.2,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 30.980737430792153,
+                "y": 18.781396561643604,
+                "z": 0.0
+              },
+              "battery_level_pct": 35.8
+            },
+            "internal_temp_c": 30.2,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T16:42:35+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0002",
+            "position": {
+              "x": 31.11420249938965,
+              "y": 17.790342330932617,
+              "z": 0.0
+            },
+            "battery_level_pct": 35.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 30.4,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 31.114202338145084,
+                "y": 17.790343021967125,
+                "z": 0.0
+              },
+              "battery_level_pct": 35.6
+            },
+            "internal_temp_c": 30.4,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T16:42:36+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0002",
+            "position": {
+              "x": 31.24766731262207,
+              "y": 16.79928970336914,
+              "z": 0.0
+            },
+            "battery_level_pct": 35.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 30.6,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 31.247667245498015,
+                "y": 16.799289482290646,
+                "z": 0.0
+              },
+              "battery_level_pct": 35.4
+            },
+            "internal_temp_c": 30.6,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T16:42:37+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0002",
+            "position": {
+              "x": 31.381132125854492,
+              "y": 15.808236122131348,
+              "z": 0.0
+            },
+            "battery_level_pct": 35.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 30.8,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 31.38113215285094,
+                "y": 15.80823594261417,
+                "z": 0.0
+              },
+              "battery_level_pct": 35.2
+            },
+            "internal_temp_c": 30.8,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T16:42:39+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0002",
+            "position": {
+              "x": 31.514596939086914,
+              "y": 14.817182540893555,
+              "z": 0.0
+            },
+            "battery_level_pct": 35.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 31.0,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 31.514597060203872,
+                "y": 14.817182402937693,
+                "z": 0.0
+              },
+              "battery_level_pct": 35.0
+            },
+            "internal_temp_c": 31.0,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T16:42:40+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0002",
+            "position": {
+              "x": 31.648061752319336,
+              "y": 13.826128959655762,
+              "z": 0.0
+            },
+            "battery_level_pct": 34.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 31.2,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 31.6480619675568,
+                "y": 13.826128863261216,
+                "z": 0.0
+              },
+              "battery_level_pct": 34.8
+            },
+            "internal_temp_c": 31.2,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T16:42:41+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0002",
+            "position": {
+              "x": 31.781526565551758,
+              "y": 12.835075378417969,
+              "z": 0.0
+            },
+            "battery_level_pct": 34.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 31.4,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 31.78152687490973,
+                "y": 12.83507532358474,
+                "z": 0.0
+              },
+              "battery_level_pct": 34.6
+            },
+            "internal_temp_c": 31.4,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T16:42:42+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0002",
+            "position": {
+              "x": 31.91499137878418,
+              "y": 11.844021797180176,
+              "z": 0.0
+            },
+            "battery_level_pct": 34.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 31.6,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 31.914991782262657,
+                "y": 11.844021783908262,
+                "z": 0.0
+              },
+              "battery_level_pct": 34.4
+            },
+            "internal_temp_c": 31.6,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T16:42:43+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0002",
+            "position": {
+              "x": 32.5,
+              "y": 7.5,
+              "z": 0.0
+            },
+            "battery_level_pct": 34.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 31.8,
+              "current_speed_m_s": 0.8,
+              "status": "running",
+              "errors": [],
+              "position": {
+                "x": 32.5,
+                "y": 7.5,
+                "z": 0.0
+              },
+              "battery_level_pct": 34.2
+            },
+            "internal_temp_c": 31.8,
+            "current_speed_m_s": 0.8,
+            "status": "running",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T16:42:44+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0002",
+            "position": {
+              "x": 32.85437774658203,
+              "y": 7.720544815063477,
+              "z": 0.0
+            },
+            "battery_level_pct": 32.0,
+            "progress_pct": 100.0,
+            "params": {
+              "internal_temp_c": 32.0,
               "current_speed_m_s": 0.0,
               "status": "completed",
               "errors": [],
               "position": {
-                "x": -0.3177534979406941,
-                "y": 0.47381779501337296,
+                "x": 32.85437820725631,
+                "y": 7.720544731894831,
                 "z": 0.0
               },
-              "battery_level_pct": 96.0
+              "battery_level_pct": 32.2
             },
-            "internal_temp_c": 28.2,
+            "internal_temp_c": 32.0,
             "current_speed_m_s": 0.0,
             "status": "completed",
             "errors": []
           }
         },
         {
-          "ts": "2025-12-11T14:37:20+00:00",
+          "ts": "2025-12-11T16:42:44+00:00",
           "type": "COMPLETE",
           "rover": "R-001",
           "payload": {
@@ -586,7 +2251,7 @@
         }
       ],
       "last_progress_pct": 100.0,
-      "completed_at": "2025-12-11T14:37:20+00:00"
+      "completed_at": "2025-12-11T16:42:44+00:00"
     },
     "M-0003": {
       "mission_id": "M-0003",
@@ -609,483 +2274,2644 @@
       "priority": 3,
       "max_duration_s": 20.0,
       "update_interval_s": 1.0,
-      "created_at": "2025-12-11T14:35:35+00:00",
+      "created_at": "2025-12-11T16:40:59+00:00",
       "state": "COMPLETED",
       "assigned_rover": "R-001",
-      "assigned_at": "2025-12-11T14:37:04+00:00",
+      "assigned_at": "2025-12-11T16:41:07+00:00",
       "history": [
         {
-          "ts": "2025-12-11T14:37:04+00:00",
+          "ts": "2025-12-11T16:41:07+00:00",
           "type": "ASSIGNED",
           "rover": "R-001"
         },
         {
-          "ts": "2025-12-11T14:37:05+00:00",
+          "ts": "2025-12-11T16:41:08+00:00",
           "type": "PROGRESS",
           "rover": "R-001",
           "payload": {
             "mission_id": "M-0003",
             "position": {
-              "x": 0.005569546949118376,
-              "y": 0.03122936375439167,
+              "x": 64.29289245605469,
+              "y": 64.29289245605469,
               "z": 0.0
             },
-            "battery_level_pct": 99.0,
+            "battery_level_pct": 49.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 25.2,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 64.29289321881345,
+                "y": 64.29289321881345,
+                "z": 0.0
+              },
+              "battery_level_pct": 49.8
+            },
+            "internal_temp_c": 25.2,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T16:41:09+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 63.585784912109375,
+              "y": 63.585784912109375,
+              "z": 0.0
+            },
+            "battery_level_pct": 49.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 25.4,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 63.5857864376269,
+                "y": 63.5857864376269,
+                "z": 0.0
+              },
+              "battery_level_pct": 49.6
+            },
+            "internal_temp_c": 25.4,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T16:41:10+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 62.87868118286133,
+              "y": 62.87868118286133,
+              "z": 0.0
+            },
+            "battery_level_pct": 49.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 25.6,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 62.878679656440355,
+                "y": 62.878679656440355,
+                "z": 0.0
+              },
+              "battery_level_pct": 49.4
+            },
+            "internal_temp_c": 25.6,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T16:41:11+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 62.171573638916016,
+              "y": 62.171573638916016,
+              "z": 0.0
+            },
+            "battery_level_pct": 49.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 25.8,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 62.17157287525381,
+                "y": 62.17157287525381,
+                "z": 0.0
+              },
+              "battery_level_pct": 49.2
+            },
+            "internal_temp_c": 25.8,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T16:41:12+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 61.4644660949707,
+              "y": 61.4644660949707,
+              "z": 0.0
+            },
+            "battery_level_pct": 49.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 26.0,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 61.46446609406726,
+                "y": 61.46446609406726,
+                "z": 0.0
+              },
+              "battery_level_pct": 49.0
+            },
+            "internal_temp_c": 26.0,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T16:41:13+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 60.75735855102539,
+              "y": 60.75735855102539,
+              "z": 0.0
+            },
+            "battery_level_pct": 48.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 26.2,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 60.757359312880716,
+                "y": 60.757359312880716,
+                "z": 0.0
+              },
+              "battery_level_pct": 48.8
+            },
+            "internal_temp_c": 26.2,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T16:41:14+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 60.05025100708008,
+              "y": 60.05025100708008,
+              "z": 0.0
+            },
+            "battery_level_pct": 48.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 26.4,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 60.05025253169417,
+                "y": 60.05025253169417,
+                "z": 0.0
+              },
+              "battery_level_pct": 48.6
+            },
+            "internal_temp_c": 26.4,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T16:41:15+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 59.34314727783203,
+              "y": 59.34314727783203,
+              "z": 0.0
+            },
+            "battery_level_pct": 48.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 26.6,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 59.343145750507624,
+                "y": 59.343145750507624,
+                "z": 0.0
+              },
+              "battery_level_pct": 48.4
+            },
+            "internal_temp_c": 26.6,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T16:41:16+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 58.63603973388672,
+              "y": 58.63603973388672,
+              "z": 0.0
+            },
+            "battery_level_pct": 48.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 26.8,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 58.63603896932108,
+                "y": 58.63603896932108,
+                "z": 0.0
+              },
+              "battery_level_pct": 48.2
+            },
+            "internal_temp_c": 26.8,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T16:41:17+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 57.928932189941406,
+              "y": 57.928932189941406,
+              "z": 0.0
+            },
+            "battery_level_pct": 48.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 27.0,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 57.92893218813453,
+                "y": 57.92893218813453,
+                "z": 0.0
+              },
+              "battery_level_pct": 48.0
+            },
+            "internal_temp_c": 27.0,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T16:41:18+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 57.221824645996094,
+              "y": 57.221824645996094,
+              "z": 0.0
+            },
+            "battery_level_pct": 47.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 27.2,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 57.221825406947985,
+                "y": 57.221825406947985,
+                "z": 0.0
+              },
+              "battery_level_pct": 47.8
+            },
+            "internal_temp_c": 27.2,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T16:41:19+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 56.51471710205078,
+              "y": 56.51471710205078,
+              "z": 0.0
+            },
+            "battery_level_pct": 47.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 27.4,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 56.51471862576144,
+                "y": 56.51471862576144,
+                "z": 0.0
+              },
+              "battery_level_pct": 47.6
+            },
+            "internal_temp_c": 27.4,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T16:41:20+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 55.807613372802734,
+              "y": 55.807613372802734,
+              "z": 0.0
+            },
+            "battery_level_pct": 47.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 27.6,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 55.80761184457489,
+                "y": 55.80761184457489,
+                "z": 0.0
+              },
+              "battery_level_pct": 47.4
+            },
+            "internal_temp_c": 27.6,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T16:41:21+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 55.10050582885742,
+              "y": 55.10050582885742,
+              "z": 0.0
+            },
+            "battery_level_pct": 47.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 27.8,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 55.10050506338835,
+                "y": 55.10050506338835,
+                "z": 0.0
+              },
+              "battery_level_pct": 47.2
+            },
+            "internal_temp_c": 27.8,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T16:41:22+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 54.39339828491211,
+              "y": 54.39339828491211,
+              "z": 0.0
+            },
+            "battery_level_pct": 47.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 28.0,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 54.3933982822018,
+                "y": 54.3933982822018,
+                "z": 0.0
+              },
+              "battery_level_pct": 47.0
+            },
+            "internal_temp_c": 28.0,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T16:41:23+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 53.6862907409668,
+              "y": 53.6862907409668,
+              "z": 0.0
+            },
+            "battery_level_pct": 46.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 28.2,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 53.686291501015255,
+                "y": 53.686291501015255,
+                "z": 0.0
+              },
+              "battery_level_pct": 46.8
+            },
+            "internal_temp_c": 28.2,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T16:41:24+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 52.979183197021484,
+              "y": 52.979183197021484,
+              "z": 0.0
+            },
+            "battery_level_pct": 46.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 28.4,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 52.97918471982871,
+                "y": 52.97918471982871,
+                "z": 0.0
+              },
+              "battery_level_pct": 46.6
+            },
+            "internal_temp_c": 28.4,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T16:41:25+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 52.27207946777344,
+              "y": 52.27207946777344,
+              "z": 0.0
+            },
+            "battery_level_pct": 46.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 28.6,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 52.27207793864216,
+                "y": 52.27207793864216,
+                "z": 0.0
+              },
+              "battery_level_pct": 46.4
+            },
+            "internal_temp_c": 28.6,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T16:41:26+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 51.564971923828125,
+              "y": 51.564971923828125,
+              "z": 0.0
+            },
+            "battery_level_pct": 46.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 28.8,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 51.564971157455616,
+                "y": 51.564971157455616,
+                "z": 0.0
+              },
+              "battery_level_pct": 46.2
+            },
+            "internal_temp_c": 28.8,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T16:41:27+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 50.85786437988281,
+              "y": 50.85786437988281,
+              "z": 0.0
+            },
+            "battery_level_pct": 46.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 29.0,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 50.85786437626907,
+                "y": 50.85786437626907,
+                "z": 0.0
+              },
+              "battery_level_pct": 46.0
+            },
+            "internal_temp_c": 29.0,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T16:41:28+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 50.1507568359375,
+              "y": 50.1507568359375,
+              "z": 0.0
+            },
+            "battery_level_pct": 45.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 29.2,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 50.150757595082524,
+                "y": 50.150757595082524,
+                "z": 0.0
+              },
+              "battery_level_pct": 45.8
+            },
+            "internal_temp_c": 29.2,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T16:41:29+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 49.44364929199219,
+              "y": 49.44364929199219,
+              "z": 0.0
+            },
+            "battery_level_pct": 45.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 29.4,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 49.44365081389598,
+                "y": 49.44365081389598,
+                "z": 0.0
+              },
+              "battery_level_pct": 45.6
+            },
+            "internal_temp_c": 29.4,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T16:41:30+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 48.73654556274414,
+              "y": 48.73654556274414,
+              "z": 0.0
+            },
+            "battery_level_pct": 45.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 29.6,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 48.73654403270943,
+                "y": 48.73654403270943,
+                "z": 0.0
+              },
+              "battery_level_pct": 45.4
+            },
+            "internal_temp_c": 29.6,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T16:41:31+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 48.02943801879883,
+              "y": 48.02943801879883,
+              "z": 0.0
+            },
+            "battery_level_pct": 45.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 29.8,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 48.029437251522886,
+                "y": 48.029437251522886,
+                "z": 0.0
+              },
+              "battery_level_pct": 45.2
+            },
+            "internal_temp_c": 29.8,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T16:41:32+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 47.322330474853516,
+              "y": 47.322330474853516,
+              "z": 0.0
+            },
+            "battery_level_pct": 45.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 30.0,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 47.32233047033634,
+                "y": 47.32233047033634,
+                "z": 0.0
+              },
+              "battery_level_pct": 45.0
+            },
+            "internal_temp_c": 30.0,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T16:41:33+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 46.6152229309082,
+              "y": 46.6152229309082,
+              "z": 0.0
+            },
+            "battery_level_pct": 44.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 30.2,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 46.61522368914979,
+                "y": 46.61522368914979,
+                "z": 0.0
+              },
+              "battery_level_pct": 44.8
+            },
+            "internal_temp_c": 30.2,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T16:41:34+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 45.90811538696289,
+              "y": 45.90811538696289,
+              "z": 0.0
+            },
+            "battery_level_pct": 44.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 30.4,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 45.90811690796325,
+                "y": 45.90811690796325,
+                "z": 0.0
+              },
+              "battery_level_pct": 44.6
+            },
+            "internal_temp_c": 30.4,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T16:41:35+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 45.201011657714844,
+              "y": 45.201011657714844,
+              "z": 0.0
+            },
+            "battery_level_pct": 44.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 30.6,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 45.2010101267767,
+                "y": 45.2010101267767,
+                "z": 0.0
+              },
+              "battery_level_pct": 44.4
+            },
+            "internal_temp_c": 30.6,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T16:41:36+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 44.49390411376953,
+              "y": 44.49390411376953,
+              "z": 0.0
+            },
+            "battery_level_pct": 44.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 30.8,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 44.493903345590155,
+                "y": 44.493903345590155,
+                "z": 0.0
+              },
+              "battery_level_pct": 44.2
+            },
+            "internal_temp_c": 30.8,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T16:41:37+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 43.78679656982422,
+              "y": 43.78679656982422,
+              "z": 0.0
+            },
+            "battery_level_pct": 44.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 31.0,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 43.78679656440361,
+                "y": 43.78679656440361,
+                "z": 0.0
+              },
+              "battery_level_pct": 44.0
+            },
+            "internal_temp_c": 31.0,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T16:41:38+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 43.079689025878906,
+              "y": 43.079689025878906,
+              "z": 0.0
+            },
+            "battery_level_pct": 43.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 31.2,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 43.07968978321706,
+                "y": 43.07968978321706,
+                "z": 0.0
+              },
+              "battery_level_pct": 43.8
+            },
+            "internal_temp_c": 31.2,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T16:41:39+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 42.372581481933594,
+              "y": 42.372581481933594,
+              "z": 0.0
+            },
+            "battery_level_pct": 43.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 31.4,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 42.37258300203052,
+                "y": 42.37258300203052,
+                "z": 0.0
+              },
+              "battery_level_pct": 43.6
+            },
+            "internal_temp_c": 31.4,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T16:41:40+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 41.66547775268555,
+              "y": 41.66547775268555,
+              "z": 0.0
+            },
+            "battery_level_pct": 43.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 31.6,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 41.66547622084397,
+                "y": 41.66547622084397,
+                "z": 0.0
+              },
+              "battery_level_pct": 43.4
+            },
+            "internal_temp_c": 31.6,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T16:41:41+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 40.958370208740234,
+              "y": 40.958370208740234,
+              "z": 0.0
+            },
+            "battery_level_pct": 43.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 31.8,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 40.958369439657424,
+                "y": 40.958369439657424,
+                "z": 0.0
+              },
+              "battery_level_pct": 43.2
+            },
+            "internal_temp_c": 31.8,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T16:41:42+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 40.25126266479492,
+              "y": 40.25126266479492,
+              "z": 0.0
+            },
+            "battery_level_pct": 43.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 32.0,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 40.25126265847088,
+                "y": 40.25126265847088,
+                "z": 0.0
+              },
+              "battery_level_pct": 43.0
+            },
+            "internal_temp_c": 32.0,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T16:41:43+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 39.54415512084961,
+              "y": 39.54415512084961,
+              "z": 0.0
+            },
+            "battery_level_pct": 42.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 32.2,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 39.54415587728433,
+                "y": 39.54415587728433,
+                "z": 0.0
+              },
+              "battery_level_pct": 42.8
+            },
+            "internal_temp_c": 32.2,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T16:41:44+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 38.8370475769043,
+              "y": 38.8370475769043,
+              "z": 0.0
+            },
+            "battery_level_pct": 42.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 32.4,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 38.837049096097786,
+                "y": 38.837049096097786,
+                "z": 0.0
+              },
+              "battery_level_pct": 42.6
+            },
+            "internal_temp_c": 32.4,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T16:41:45+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 38.12994384765625,
+              "y": 38.12994384765625,
+              "z": 0.0
+            },
+            "battery_level_pct": 42.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 32.6,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 38.12994231491124,
+                "y": 38.12994231491124,
+                "z": 0.0
+              },
+              "battery_level_pct": 42.4
+            },
+            "internal_temp_c": 32.6,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T16:41:46+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 37.42283630371094,
+              "y": 37.42283630371094,
+              "z": 0.0
+            },
+            "battery_level_pct": 42.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 32.8,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 37.422835533724694,
+                "y": 37.422835533724694,
+                "z": 0.0
+              },
+              "battery_level_pct": 42.2
+            },
+            "internal_temp_c": 32.8,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T16:41:47+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 36.715728759765625,
+              "y": 36.715728759765625,
+              "z": 0.0
+            },
+            "battery_level_pct": 42.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 33.0,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 36.71572875253815,
+                "y": 36.71572875253815,
+                "z": 0.0
+              },
+              "battery_level_pct": 42.0
+            },
+            "internal_temp_c": 33.0,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T16:41:48+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 36.00862121582031,
+              "y": 36.00862121582031,
+              "z": 0.0
+            },
+            "battery_level_pct": 41.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 33.2,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 36.0086219713516,
+                "y": 36.0086219713516,
+                "z": 0.0
+              },
+              "battery_level_pct": 41.8
+            },
+            "internal_temp_c": 33.2,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T16:41:49+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 35.301513671875,
+              "y": 35.301513671875,
+              "z": 0.0
+            },
+            "battery_level_pct": 41.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 33.4,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 35.301515190165055,
+                "y": 35.301515190165055,
+                "z": 0.0
+              },
+              "battery_level_pct": 41.6
+            },
+            "internal_temp_c": 33.4,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T16:41:50+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 34.59440994262695,
+              "y": 34.59440994262695,
+              "z": 0.0
+            },
+            "battery_level_pct": 41.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 33.6,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 34.59440840897851,
+                "y": 34.59440840897851,
+                "z": 0.0
+              },
+              "battery_level_pct": 41.4
+            },
+            "internal_temp_c": 33.6,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T16:41:51+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 33.88730239868164,
+              "y": 33.88730239868164,
+              "z": 0.0
+            },
+            "battery_level_pct": 41.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 33.8,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 33.88730162779196,
+                "y": 33.88730162779196,
+                "z": 0.0
+              },
+              "battery_level_pct": 41.2
+            },
+            "internal_temp_c": 33.8,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T16:41:52+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 33.18019485473633,
+              "y": 33.18019485473633,
+              "z": 0.0
+            },
+            "battery_level_pct": 41.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 34.0,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 33.18019484660542,
+                "y": 33.18019484660542,
+                "z": 0.0
+              },
+              "battery_level_pct": 41.0
+            },
+            "internal_temp_c": 34.0,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T16:41:53+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 32.473087310791016,
+              "y": 32.473087310791016,
+              "z": 0.0
+            },
+            "battery_level_pct": 40.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 34.2,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 32.47308806541887,
+                "y": 32.47308806541887,
+                "z": 0.0
+              },
+              "battery_level_pct": 40.8
+            },
+            "internal_temp_c": 34.2,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T16:41:54+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 31.765981674194336,
+              "y": 31.765981674194336,
+              "z": 0.0
+            },
+            "battery_level_pct": 40.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 34.4,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 31.765981284232325,
+                "y": 31.765981284232325,
+                "z": 0.0
+              },
+              "battery_level_pct": 40.6
+            },
+            "internal_temp_c": 34.4,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T16:41:55+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 31.058874130249023,
+              "y": 31.058874130249023,
+              "z": 0.0
+            },
+            "battery_level_pct": 40.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 34.6,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 31.05887450304578,
+                "y": 31.05887450304578,
+                "z": 0.0
+              },
+              "battery_level_pct": 40.4
+            },
+            "internal_temp_c": 34.6,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T16:41:56+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 30.351768493652344,
+              "y": 30.351768493652344,
+              "z": 0.0
+            },
+            "battery_level_pct": 40.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 34.8,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 30.351767721859233,
+                "y": 30.351767721859233,
+                "z": 0.0
+              },
+              "battery_level_pct": 40.2
+            },
+            "internal_temp_c": 34.8,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T16:41:57+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 29.64466094970703,
+              "y": 29.64466094970703,
+              "z": 0.0
+            },
+            "battery_level_pct": 40.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 35.0,
+              "current_speed_m_s": 0.0,
+              "status": "cooling_down",
+              "errors": [
+                {
+                  "code": "TEMP-OVERHEAT",
+                  "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+                }
+              ],
+              "position": {
+                "x": 29.644660940672686,
+                "y": 29.644660940672686,
+                "z": 0.0
+              },
+              "battery_level_pct": 40.0
+            },
+            "internal_temp_c": 35.0,
+            "current_speed_m_s": 0.0,
+            "status": "cooling_down",
+            "errors": [
+              {
+                "code": "TEMP-OVERHEAT",
+                "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+              }
+            ]
+          }
+        },
+        {
+          "ts": "2025-12-11T16:41:58+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 29.64466094970703,
+              "y": 29.64466094970703,
+              "z": 0.0
+            },
+            "battery_level_pct": 40.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 34.0,
+              "current_speed_m_s": 0.0,
+              "status": "cooling_down",
+              "errors": [
+                {
+                  "code": "TEMP-OVERHEAT",
+                  "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+                }
+              ],
+              "position": {
+                "x": 29.644660940672686,
+                "y": 29.644660940672686,
+                "z": 0.0
+              },
+              "battery_level_pct": 40.0
+            },
+            "internal_temp_c": 34.0,
+            "current_speed_m_s": 0.0,
+            "status": "cooling_down",
+            "errors": [
+              {
+                "code": "TEMP-OVERHEAT",
+                "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+              }
+            ]
+          }
+        },
+        {
+          "ts": "2025-12-11T16:41:59+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 29.64466094970703,
+              "y": 29.64466094970703,
+              "z": 0.0
+            },
+            "battery_level_pct": 40.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 33.0,
+              "current_speed_m_s": 0.0,
+              "status": "cooling_down",
+              "errors": [
+                {
+                  "code": "TEMP-OVERHEAT",
+                  "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+                }
+              ],
+              "position": {
+                "x": 29.644660940672686,
+                "y": 29.644660940672686,
+                "z": 0.0
+              },
+              "battery_level_pct": 40.0
+            },
+            "internal_temp_c": 33.0,
+            "current_speed_m_s": 0.0,
+            "status": "cooling_down",
+            "errors": [
+              {
+                "code": "TEMP-OVERHEAT",
+                "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+              }
+            ]
+          }
+        },
+        {
+          "ts": "2025-12-11T16:42:00+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 29.64466094970703,
+              "y": 29.64466094970703,
+              "z": 0.0
+            },
+            "battery_level_pct": 40.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 32.0,
+              "current_speed_m_s": 0.0,
+              "status": "cooling_down",
+              "errors": [
+                {
+                  "code": "TEMP-OVERHEAT",
+                  "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+                }
+              ],
+              "position": {
+                "x": 29.644660940672686,
+                "y": 29.644660940672686,
+                "z": 0.0
+              },
+              "battery_level_pct": 40.0
+            },
+            "internal_temp_c": 32.0,
+            "current_speed_m_s": 0.0,
+            "status": "cooling_down",
+            "errors": [
+              {
+                "code": "TEMP-OVERHEAT",
+                "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+              }
+            ]
+          }
+        },
+        {
+          "ts": "2025-12-11T16:42:01+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 29.64466094970703,
+              "y": 29.64466094970703,
+              "z": 0.0
+            },
+            "battery_level_pct": 40.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 31.0,
+              "current_speed_m_s": 0.0,
+              "status": "cooling_down",
+              "errors": [
+                {
+                  "code": "TEMP-OVERHEAT",
+                  "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+                }
+              ],
+              "position": {
+                "x": 29.644660940672686,
+                "y": 29.644660940672686,
+                "z": 0.0
+              },
+              "battery_level_pct": 40.0
+            },
+            "internal_temp_c": 31.0,
+            "current_speed_m_s": 0.0,
+            "status": "cooling_down",
+            "errors": [
+              {
+                "code": "TEMP-OVERHEAT",
+                "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+              }
+            ]
+          }
+        },
+        {
+          "ts": "2025-12-11T16:42:02+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 29.64466094970703,
+              "y": 29.64466094970703,
+              "z": 0.0
+            },
+            "battery_level_pct": 40.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 30.0,
+              "current_speed_m_s": 0.0,
+              "status": "cooling_down",
+              "errors": [
+                {
+                  "code": "TEMP-OVERHEAT",
+                  "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+                }
+              ],
+              "position": {
+                "x": 29.644660940672686,
+                "y": 29.644660940672686,
+                "z": 0.0
+              },
+              "battery_level_pct": 40.0
+            },
+            "internal_temp_c": 30.0,
+            "current_speed_m_s": 0.0,
+            "status": "cooling_down",
+            "errors": [
+              {
+                "code": "TEMP-OVERHEAT",
+                "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+              }
+            ]
+          }
+        },
+        {
+          "ts": "2025-12-11T16:42:03+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 29.64466094970703,
+              "y": 29.64466094970703,
+              "z": 0.0
+            },
+            "battery_level_pct": 40.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 29.0,
+              "current_speed_m_s": 0.0,
+              "status": "cooling_down",
+              "errors": [
+                {
+                  "code": "TEMP-OVERHEAT",
+                  "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+                }
+              ],
+              "position": {
+                "x": 29.644660940672686,
+                "y": 29.644660940672686,
+                "z": 0.0
+              },
+              "battery_level_pct": 40.0
+            },
+            "internal_temp_c": 29.0,
+            "current_speed_m_s": 0.0,
+            "status": "cooling_down",
+            "errors": [
+              {
+                "code": "TEMP-OVERHEAT",
+                "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+              }
+            ]
+          }
+        },
+        {
+          "ts": "2025-12-11T16:42:04+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 29.64466094970703,
+              "y": 29.64466094970703,
+              "z": 0.0
+            },
+            "battery_level_pct": 40.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 28.0,
+              "current_speed_m_s": 0.0,
+              "status": "cooling_down",
+              "errors": [
+                {
+                  "code": "TEMP-OVERHEAT",
+                  "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+                }
+              ],
+              "position": {
+                "x": 29.644660940672686,
+                "y": 29.644660940672686,
+                "z": 0.0
+              },
+              "battery_level_pct": 40.0
+            },
+            "internal_temp_c": 28.0,
+            "current_speed_m_s": 0.0,
+            "status": "cooling_down",
+            "errors": [
+              {
+                "code": "TEMP-OVERHEAT",
+                "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+              }
+            ]
+          }
+        },
+        {
+          "ts": "2025-12-11T16:42:05+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 29.64466094970703,
+              "y": 29.64466094970703,
+              "z": 0.0
+            },
+            "battery_level_pct": 40.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 27.0,
+              "current_speed_m_s": 0.0,
+              "status": "cooling_down",
+              "errors": [
+                {
+                  "code": "TEMP-OVERHEAT",
+                  "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+                }
+              ],
+              "position": {
+                "x": 29.644660940672686,
+                "y": 29.644660940672686,
+                "z": 0.0
+              },
+              "battery_level_pct": 40.0
+            },
+            "internal_temp_c": 27.0,
+            "current_speed_m_s": 0.0,
+            "status": "cooling_down",
+            "errors": [
+              {
+                "code": "TEMP-OVERHEAT",
+                "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+              }
+            ]
+          }
+        },
+        {
+          "ts": "2025-12-11T16:42:06+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 29.64466094970703,
+              "y": 29.64466094970703,
+              "z": 0.0
+            },
+            "battery_level_pct": 40.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 26.0,
+              "current_speed_m_s": 0.0,
+              "status": "cooling_down",
+              "errors": [
+                {
+                  "code": "TEMP-OVERHEAT",
+                  "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+                }
+              ],
+              "position": {
+                "x": 29.644660940672686,
+                "y": 29.644660940672686,
+                "z": 0.0
+              },
+              "battery_level_pct": 40.0
+            },
+            "internal_temp_c": 26.0,
+            "current_speed_m_s": 0.0,
+            "status": "cooling_down",
+            "errors": [
+              {
+                "code": "TEMP-OVERHEAT",
+                "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+              }
+            ]
+          }
+        },
+        {
+          "ts": "2025-12-11T16:42:07+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 29.64466094970703,
+              "y": 29.64466094970703,
+              "z": 0.0
+            },
+            "battery_level_pct": 40.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 25.0,
+              "current_speed_m_s": 0.0,
+              "status": "cooling_down",
+              "errors": [
+                {
+                  "code": "TEMP-OVERHEAT",
+                  "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+                }
+              ],
+              "position": {
+                "x": 29.644660940672686,
+                "y": 29.644660940672686,
+                "z": 0.0
+              },
+              "battery_level_pct": 40.0
+            },
+            "internal_temp_c": 25.0,
+            "current_speed_m_s": 0.0,
+            "status": "cooling_down",
+            "errors": [
+              {
+                "code": "TEMP-OVERHEAT",
+                "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+              }
+            ]
+          }
+        },
+        {
+          "ts": "2025-12-11T16:42:08+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 29.64466094970703,
+              "y": 29.64466094970703,
+              "z": 0.0
+            },
+            "battery_level_pct": 40.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 25.0,
+              "current_speed_m_s": 0.0,
+              "status": "running",
+              "errors": [
+                {
+                  "code": "TEMP-OVERHEAT",
+                  "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+                }
+              ],
+              "position": {
+                "x": 29.644660940672686,
+                "y": 29.644660940672686,
+                "z": 0.0
+              },
+              "battery_level_pct": 40.0
+            },
+            "internal_temp_c": 25.0,
+            "current_speed_m_s": 0.0,
+            "status": "running",
+            "errors": [
+              {
+                "code": "TEMP-OVERHEAT",
+                "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+              }
+            ]
+          }
+        },
+        {
+          "ts": "2025-12-11T16:42:09+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 29.646923065185547,
+              "y": 29.650365829467773,
+              "z": 0.0
+            },
+            "battery_level_pct": 39.0,
             "progress_pct": 6.670000076293945,
             "params": {
               "internal_temp_c": 25.2,
               "current_speed_m_s": 0.8,
               "status": "running",
-              "errors": [],
+              "errors": [
+                {
+                  "code": "TEMP-OVERHEAT",
+                  "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+                }
+              ],
               "position": {
-                "x": 0.005569546940086112,
-                "y": 0.0312293638239835,
+                "x": 29.646923658521967,
+                "y": 29.65036537705593,
                 "z": 0.0
               },
-              "battery_level_pct": 99.9
+              "battery_level_pct": 39.9
             },
             "internal_temp_c": 25.2,
             "current_speed_m_s": 0.8,
             "status": "running",
-            "errors": []
+            "errors": [
+              {
+                "code": "TEMP-OVERHEAT",
+                "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+              }
+            ]
           }
         },
         {
-          "ts": "2025-12-11T14:37:06+00:00",
+          "ts": "2025-12-11T16:42:10+00:00",
           "type": "PROGRESS",
           "rover": "R-001",
           "payload": {
             "mission_id": "M-0003",
             "position": {
-              "x": -0.0028965831734240055,
-              "y": 0.038319434970617294,
+              "x": 29.624855041503906,
+              "y": 29.68290901184082,
               "z": 0.0
             },
-            "battery_level_pct": 99.0,
+            "battery_level_pct": 39.0,
             "progress_pct": 13.329999923706055,
             "params": {
               "internal_temp_c": 25.4,
               "current_speed_m_s": 0.8,
               "status": "running",
-              "errors": [],
+              "errors": [
+                {
+                  "code": "TEMP-OVERHEAT",
+                  "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+                }
+              ],
               "position": {
-                "x": -0.002896583122336405,
-                "y": 0.03831943443205105,
+                "x": 29.624854290684603,
+                "y": 29.682908473325075,
                 "z": 0.0
               },
-              "battery_level_pct": 99.7
+              "battery_level_pct": 39.7
             },
             "internal_temp_c": 25.4,
             "current_speed_m_s": 0.8,
             "status": "running",
-            "errors": []
+            "errors": [
+              {
+                "code": "TEMP-OVERHEAT",
+                "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+              }
+            ]
           }
         },
         {
-          "ts": "2025-12-11T14:37:07+00:00",
+          "ts": "2025-12-11T16:42:11+00:00",
           "type": "PROGRESS",
           "rover": "R-001",
           "payload": {
             "mission_id": "M-0003",
             "position": {
-              "x": -0.029487356543540955,
-              "y": 0.0179302841424942,
+              "x": 29.626140594482422,
+              "y": 29.70361328125,
               "z": 0.0
             },
-            "battery_level_pct": 99.0,
+            "battery_level_pct": 39.0,
             "progress_pct": 20.0,
             "params": {
               "internal_temp_c": 25.6,
               "current_speed_m_s": 0.8,
               "status": "running",
-              "errors": [],
+              "errors": [
+                {
+                  "code": "TEMP-OVERHEAT",
+                  "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+                }
+              ],
               "position": {
-                "x": -0.029487357148866442,
-                "y": 0.0179302835311817,
+                "x": 29.626140407906522,
+                "y": 29.703613345158885,
                 "z": 0.0
               },
-              "battery_level_pct": 99.6
+              "battery_level_pct": 39.6
             },
             "internal_temp_c": 25.6,
             "current_speed_m_s": 0.8,
             "status": "running",
-            "errors": []
+            "errors": [
+              {
+                "code": "TEMP-OVERHEAT",
+                "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+              }
+            ]
           }
         },
         {
-          "ts": "2025-12-11T14:37:08+00:00",
+          "ts": "2025-12-11T16:42:12+00:00",
           "type": "PROGRESS",
           "rover": "R-001",
           "payload": {
             "mission_id": "M-0003",
             "position": {
-              "x": -0.0036301533691585064,
-              "y": 0.043723415583372116,
+              "x": 29.60147476196289,
+              "y": 29.691137313842773,
               "z": 0.0
             },
-            "battery_level_pct": 99.0,
+            "battery_level_pct": 39.0,
             "progress_pct": 26.670000076293945,
             "params": {
               "internal_temp_c": 25.8,
               "current_speed_m_s": 0.8,
               "status": "running",
-              "errors": [],
+              "errors": [
+                {
+                  "code": "TEMP-OVERHEAT",
+                  "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+                }
+              ],
               "position": {
-                "x": -0.003630153346635096,
-                "y": 0.043723417305795764,
+                "x": 29.601474368343286,
+                "y": 29.69113705705788,
                 "z": 0.0
               },
-              "battery_level_pct": 99.5
+              "battery_level_pct": 39.5
             },
             "internal_temp_c": 25.8,
             "current_speed_m_s": 0.8,
             "status": "running",
-            "errors": []
+            "errors": [
+              {
+                "code": "TEMP-OVERHEAT",
+                "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+              }
+            ]
           }
         },
         {
-          "ts": "2025-12-11T14:37:09+00:00",
+          "ts": "2025-12-11T16:42:13+00:00",
           "type": "PROGRESS",
           "rover": "R-001",
           "payload": {
             "mission_id": "M-0003",
             "position": {
-              "x": 0.004094038624316454,
-              "y": 0.01727285608649254,
+              "x": 29.577054977416992,
+              "y": 29.689586639404297,
               "z": 0.0
             },
-            "battery_level_pct": 99.0,
+            "battery_level_pct": 39.0,
             "progress_pct": 33.33000183105469,
             "params": {
               "internal_temp_c": 26.0,
               "current_speed_m_s": 0.8,
               "status": "running",
-              "errors": [],
+              "errors": [
+                {
+                  "code": "TEMP-OVERHEAT",
+                  "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+                }
+              ],
               "position": {
-                "x": 0.004094038698676081,
-                "y": 0.0172728560183507,
+                "x": 29.57705479407423,
+                "y": 29.689587123108097,
                 "z": 0.0
               },
-              "battery_level_pct": 99.3
+              "battery_level_pct": 39.3
             },
             "internal_temp_c": 26.0,
             "current_speed_m_s": 0.8,
             "status": "running",
-            "errors": []
+            "errors": [
+              {
+                "code": "TEMP-OVERHEAT",
+                "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+              }
+            ]
           }
         },
         {
-          "ts": "2025-12-11T14:37:10+00:00",
+          "ts": "2025-12-11T16:42:14+00:00",
           "type": "PROGRESS",
           "rover": "R-001",
           "payload": {
             "mission_id": "M-0003",
             "position": {
-              "x": 0.014729136601090431,
-              "y": -0.008831655606627464,
+              "x": 29.590194702148438,
+              "y": 29.673978805541992,
               "z": 0.0
             },
-            "battery_level_pct": 99.0,
+            "battery_level_pct": 39.0,
             "progress_pct": 40.0,
             "params": {
               "internal_temp_c": 26.2,
               "current_speed_m_s": 0.8,
               "status": "running",
-              "errors": [],
+              "errors": [
+                {
+                  "code": "TEMP-OVERHEAT",
+                  "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+                }
+              ],
               "position": {
-                "x": 0.014729136358853596,
-                "y": -0.00883165547647909,
+                "x": 29.59019390629372,
+                "y": 29.673978442312933,
                 "z": 0.0
               },
-              "battery_level_pct": 99.2
+              "battery_level_pct": 39.2
             },
             "internal_temp_c": 26.2,
             "current_speed_m_s": 0.8,
             "status": "running",
-            "errors": []
+            "errors": [
+              {
+                "code": "TEMP-OVERHEAT",
+                "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+              }
+            ]
           }
         },
         {
-          "ts": "2025-12-11T14:37:11+00:00",
+          "ts": "2025-12-11T16:42:15+00:00",
           "type": "PROGRESS",
           "rover": "R-001",
           "payload": {
             "mission_id": "M-0003",
             "position": {
-              "x": 0.016333088278770447,
-              "y": -0.021599331870675087,
+              "x": 29.57308578491211,
+              "y": 29.700475692749023,
               "z": 0.0
             },
-            "battery_level_pct": 99.0,
+            "battery_level_pct": 39.0,
             "progress_pct": 46.66999816894531,
             "params": {
               "internal_temp_c": 26.4,
               "current_speed_m_s": 0.8,
               "status": "running",
-              "errors": [],
+              "errors": [
+                {
+                  "code": "TEMP-OVERHEAT",
+                  "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+                }
+              ],
               "position": {
-                "x": 0.016333088681373002,
-                "y": -0.02159933232520877,
+                "x": 29.573085881359376,
+                "y": 29.700475220322453,
                 "z": 0.0
               },
-              "battery_level_pct": 99.1
+              "battery_level_pct": 39.1
             },
             "internal_temp_c": 26.4,
             "current_speed_m_s": 0.8,
             "status": "running",
-            "errors": []
+            "errors": [
+              {
+                "code": "TEMP-OVERHEAT",
+                "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+              }
+            ]
           }
         },
         {
-          "ts": "2025-12-11T14:37:12+00:00",
+          "ts": "2025-12-11T16:42:16+00:00",
           "type": "PROGRESS",
           "rover": "R-001",
           "payload": {
             "mission_id": "M-0003",
             "position": {
-              "x": 0.042701803147792816,
-              "y": -0.023547081276774406,
+              "x": 29.56805992126465,
+              "y": 29.667463302612305,
               "z": 0.0
             },
-            "battery_level_pct": 98.0,
+            "battery_level_pct": 38.0,
             "progress_pct": 53.33000183105469,
             "params": {
               "internal_temp_c": 26.6,
               "current_speed_m_s": 0.8,
               "status": "running",
-              "errors": [],
+              "errors": [
+                {
+                  "code": "TEMP-OVERHEAT",
+                  "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+                }
+              ],
               "position": {
-                "x": 0.04270180152876003,
-                "y": -0.023547081405856873,
+                "x": 29.56805945190292,
+                "y": 29.66746368120638,
                 "z": 0.0
               },
-              "battery_level_pct": 98.9
+              "battery_level_pct": 38.9
             },
             "internal_temp_c": 26.6,
             "current_speed_m_s": 0.8,
             "status": "running",
-            "errors": []
+            "errors": [
+              {
+                "code": "TEMP-OVERHEAT",
+                "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+              }
+            ]
           }
         },
         {
-          "ts": "2025-12-11T14:37:13+00:00",
+          "ts": "2025-12-11T16:42:17+00:00",
           "type": "PROGRESS",
           "rover": "R-001",
           "payload": {
             "mission_id": "M-0003",
             "position": {
-              "x": 0.06812922656536102,
-              "y": -0.05685163289308548,
+              "x": 29.578594207763672,
+              "y": 29.67404556274414,
               "z": 0.0
             },
-            "battery_level_pct": 98.0,
+            "battery_level_pct": 38.0,
             "progress_pct": 60.0,
             "params": {
               "internal_temp_c": 26.8,
               "current_speed_m_s": 0.8,
               "status": "running",
-              "errors": [],
+              "errors": [
+                {
+                  "code": "TEMP-OVERHEAT",
+                  "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+                }
+              ],
               "position": {
-                "x": 0.06812922841029795,
-                "y": -0.05685163319368577,
+                "x": 29.57859328113182,
+                "y": 29.674046485534568,
                 "z": 0.0
               },
-              "battery_level_pct": 98.8
+              "battery_level_pct": 38.8
             },
             "internal_temp_c": 26.8,
             "current_speed_m_s": 0.8,
             "status": "running",
-            "errors": []
+            "errors": [
+              {
+                "code": "TEMP-OVERHEAT",
+                "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+              }
+            ]
           }
         },
         {
-          "ts": "2025-12-11T14:37:14+00:00",
+          "ts": "2025-12-11T16:42:18+00:00",
           "type": "PROGRESS",
           "rover": "R-001",
           "payload": {
             "mission_id": "M-0003",
             "position": {
-              "x": 0.06971033662557602,
-              "y": -0.031750597059726715,
+              "x": 29.579206466674805,
+              "y": 29.661842346191406,
               "z": 0.0
             },
-            "battery_level_pct": 98.0,
+            "battery_level_pct": 38.0,
             "progress_pct": 66.66999816894531,
             "params": {
               "internal_temp_c": 27.0,
               "current_speed_m_s": 0.8,
               "status": "running",
-              "errors": [],
+              "errors": [
+                {
+                  "code": "TEMP-OVERHEAT",
+                  "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+                }
+              ],
               "position": {
-                "x": 0.06971033723724726,
-                "y": -0.0317505960674644,
+                "x": 29.579205527131645,
+                "y": 29.6618429124499,
                 "z": 0.0
               },
-              "battery_level_pct": 98.7
+              "battery_level_pct": 38.7
             },
             "internal_temp_c": 27.0,
             "current_speed_m_s": 0.8,
             "status": "running",
-            "errors": []
+            "errors": [
+              {
+                "code": "TEMP-OVERHEAT",
+                "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+              }
+            ]
           }
         },
         {
-          "ts": "2025-12-11T14:37:15+00:00",
+          "ts": "2025-12-11T16:42:19+00:00",
           "type": "PROGRESS",
           "rover": "R-001",
           "payload": {
             "mission_id": "M-0003",
             "position": {
-              "x": 0.060054145753383636,
-              "y": 0.0010075562167912722,
+              "x": 29.5812931060791,
+              "y": 29.664527893066406,
               "z": 0.0
             },
-            "battery_level_pct": 98.0,
+            "battery_level_pct": 38.0,
             "progress_pct": 73.33000183105469,
             "params": {
               "internal_temp_c": 27.2,
               "current_speed_m_s": 0.8,
               "status": "running",
-              "errors": [],
+              "errors": [
+                {
+                  "code": "TEMP-OVERHEAT",
+                  "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+                }
+              ],
               "position": {
-                "x": 0.06005414510342104,
-                "y": 0.0010075562122401696,
+                "x": 29.58129323313016,
+                "y": 29.664528014585947,
                 "z": 0.0
               },
-              "battery_level_pct": 98.5
+              "battery_level_pct": 38.5
             },
             "internal_temp_c": 27.2,
             "current_speed_m_s": 0.8,
             "status": "running",
-            "errors": []
+            "errors": [
+              {
+                "code": "TEMP-OVERHEAT",
+                "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+              }
+            ]
           }
         },
         {
-          "ts": "2025-12-11T14:37:16+00:00",
+          "ts": "2025-12-11T16:42:20+00:00",
           "type": "PROGRESS",
           "rover": "R-001",
           "payload": {
             "mission_id": "M-0003",
             "position": {
-              "x": 0.06896434724330902,
-              "y": 0.028928786516189575,
+              "x": 29.5479736328125,
+              "y": 29.64006233215332,
               "z": 0.0
             },
-            "battery_level_pct": 98.0,
+            "battery_level_pct": 38.0,
             "progress_pct": 80.0,
             "params": {
               "internal_temp_c": 27.4,
               "current_speed_m_s": 0.8,
               "status": "running",
-              "errors": [],
+              "errors": [
+                {
+                  "code": "TEMP-OVERHEAT",
+                  "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+                }
+              ],
               "position": {
-                "x": 0.06896434732762577,
-                "y": 0.028928787408119723,
+                "x": 29.54797450399854,
+                "y": 29.640061730776562,
                 "z": 0.0
               },
-              "battery_level_pct": 98.4
+              "battery_level_pct": 38.4
             },
             "internal_temp_c": 27.4,
             "current_speed_m_s": 0.8,
             "status": "running",
-            "errors": []
+            "errors": [
+              {
+                "code": "TEMP-OVERHEAT",
+                "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+              }
+            ]
           }
         },
         {
-          "ts": "2025-12-11T14:37:17+00:00",
+          "ts": "2025-12-11T16:42:21+00:00",
           "type": "PROGRESS",
           "rover": "R-001",
           "payload": {
             "mission_id": "M-0003",
             "position": {
-              "x": 0.10206694155931473,
-              "y": 0.025637531653046608,
+              "x": 29.54366111755371,
+              "y": 29.643983840942383,
               "z": 0.0
             },
-            "battery_level_pct": 98.0,
+            "battery_level_pct": 38.0,
             "progress_pct": 86.66999816894531,
             "params": {
               "internal_temp_c": 27.6,
               "current_speed_m_s": 0.8,
               "status": "running",
-              "errors": [],
+              "errors": [
+                {
+                  "code": "TEMP-OVERHEAT",
+                  "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+                }
+              ],
               "position": {
-                "x": 0.10206693787454524,
-                "y": 0.02563753125238365,
+                "x": 29.543660746180496,
+                "y": 29.643984247251748,
                 "z": 0.0
               },
-              "battery_level_pct": 98.3
+              "battery_level_pct": 38.3
             },
             "internal_temp_c": 27.6,
             "current_speed_m_s": 0.8,
             "status": "running",
-            "errors": []
+            "errors": [
+              {
+                "code": "TEMP-OVERHEAT",
+                "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+              }
+            ]
           }
         },
         {
-          "ts": "2025-12-11T14:37:18+00:00",
+          "ts": "2025-12-11T16:42:22+00:00",
           "type": "PROGRESS",
           "rover": "R-001",
           "payload": {
             "mission_id": "M-0003",
             "position": {
-              "x": 0.10834276676177979,
-              "y": 0.041028983891010284,
+              "x": 29.510944366455078,
+              "y": 29.670848846435547,
               "z": 0.0
             },
-            "battery_level_pct": 98.0,
+            "battery_level_pct": 38.0,
             "progress_pct": 93.33000183105469,
             "params": {
               "internal_temp_c": 27.8,
               "current_speed_m_s": 0.8,
               "status": "running",
-              "errors": [],
+              "errors": [
+                {
+                  "code": "TEMP-OVERHEAT",
+                  "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+                }
+              ],
               "position": {
-                "x": 0.10834276517705596,
-                "y": 0.041028982535878486,
+                "x": 29.510945142451614,
+                "y": 29.670848762670357,
                 "z": 0.0
               },
-              "battery_level_pct": 98.1
+              "battery_level_pct": 38.1
             },
             "internal_temp_c": 27.8,
             "current_speed_m_s": 0.8,
             "status": "running",
-            "errors": []
+            "errors": [
+              {
+                "code": "TEMP-OVERHEAT",
+                "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+              }
+            ]
           }
         },
         {
-          "ts": "2025-12-11T14:37:19+00:00",
+          "ts": "2025-12-11T16:42:23+00:00",
           "type": "PROGRESS",
           "rover": "R-001",
           "payload": {
             "mission_id": "M-0003",
             "position": {
-              "x": 0.12266450375318527,
-              "y": 0.06767375767230988,
+              "x": 29.512622833251953,
+              "y": 29.682985305786133,
               "z": 0.0
             },
-            "battery_level_pct": 98.0,
+            "battery_level_pct": 38.0,
             "progress_pct": 100.0,
             "params": {
               "internal_temp_c": 28.0,
               "current_speed_m_s": 0.0,
               "status": "completed",
-              "errors": [],
+              "errors": [
+                {
+                  "code": "TEMP-OVERHEAT",
+                  "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+                }
+              ],
               "position": {
-                "x": 0.12266450220418143,
-                "y": 0.06767375461953681,
+                "x": 29.512623449909928,
+                "y": 29.682985498084857,
                 "z": 0.0
               },
-              "battery_level_pct": 98.0
+              "battery_level_pct": 38.0
             },
             "internal_temp_c": 28.0,
             "current_speed_m_s": 0.0,
             "status": "completed",
-            "errors": []
+            "errors": [
+              {
+                "code": "TEMP-OVERHEAT",
+                "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+              }
+            ]
           }
         },
         {
-          "ts": "2025-12-11T14:37:19+00:00",
+          "ts": "2025-12-11T16:42:23+00:00",
           "type": "COMPLETE",
           "rover": "R-001",
           "payload": {
@@ -1100,7 +4926,7 @@
         }
       ],
       "last_progress_pct": 100.0,
-      "completed_at": "2025-12-11T14:37:19+00:00"
+      "completed_at": "2025-12-11T16:42:23+00:00"
     }
   },
   "rovers": {
@@ -1108,29 +4934,29 @@
       "rover_id": "R-001",
       "address": {
         "ip": "127.0.0.1",
-        "port": 53622
+        "port": 56944
       },
-      "last_seen": "2025-12-11T14:37:51+00:00",
+      "last_seen": "2025-12-11T16:43:25+00:00",
       "state": "IDLE",
-      "battery_level_pct": 94.0,
-      "internal_temp_c": 31.2,
+      "battery_level_pct": 27.0,
+      "internal_temp_c": 28.0,
       "current_speed_m_s": 0.0,
       "position": {
-        "x": -0.346560537815094,
-        "y": 0.4687039256095886,
+        "x": 18.907747268676758,
+        "y": 13.248854637145996,
         "z": 0.0
       },
       "last_telemetry_full": {
         "status": "completed",
-        "battery_level_pct": 94.0,
-        "internal_temp_c": 31.2,
+        "battery_level_pct": 27.0,
+        "internal_temp_c": 28.0,
         "current_speed_m_s": 0.0,
         "position": {
-          "x": -0.346560537815094,
-          "y": 0.4687039256095886,
+          "x": 18.907747268676758,
+          "y": 13.248854637145996,
           "z": 0.0
         },
-        "timestamp_ms": 1765463856042
+        "timestamp_ms": 1765471405464
       }
     }
   },

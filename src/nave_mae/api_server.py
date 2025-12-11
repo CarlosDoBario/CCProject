@@ -83,6 +83,11 @@ async def get_missions_list():
             "progress_pct": m.get("last_progress_pct", 0.0), 
             "priority": m.get("priority"),
             "assigned_rover": m.get("assigned_rover"),
+            
+            # ADICIONADO: Incluir campos de especificação da missão para o Ground Control
+            "area": m.get("area"),
+            "max_duration_s": m.get("max_duration_s"),
+            "update_interval_s": m.get("update_interval_s"),
         })
     return output
 
@@ -104,14 +109,16 @@ async def get_rovers_status():
         
         output[rid] = {
             "rover_id": rid,
+            # NOTA: Usar o estado do RDATA (que vem do MissionStore) para o estado primário.
             "state": rdata.get("state", "UNKNOWN"), 
             "last_seen": rdata.get("last_seen"),
             
-            # Dados detalhados que o Ground Control precisa
+            # Dados detalhados consolidados que o Ground Control precisa
             "battery_level_pct": detailed_data["battery_level_pct"],
             "internal_temp_c": detailed_data["internal_temp_c"],
             "current_speed_m_s": detailed_data["current_speed_m_s"],
             "position": detailed_data["position"],
+            "status": detailed_data["status"], # Adicionar o status detalhado da telemetria
         }
     return output
 

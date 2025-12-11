@@ -1,16 +1,9 @@
-#!/usr/bin/env python3
-"""
-gc_cliente.py
-
-Ground Control Client: Consome a API de Observação da Nave-Mãe (via HTTP REST)
-e exibe o estado das missões e a telemetria dos rovers.
-"""
 import argparse
 import time
 import json
 import logging
 from typing import Dict, Any, List, Optional
-import requests # Assumimos que requests está instalado (pip install requests)
+import requests
 
 from common import config, utils
 
@@ -18,6 +11,12 @@ logger = utils.get_logger("groundcontrol.client")
 
 
 class GroundControlClient:
+    # Definição estática dos postos de carregamento (deve corresponder ao RoverSim)
+    CHARGING_STATIONS = [
+        {"id": "CS-A", "x": 45.0, "y": 45.0, "z": 0.0},
+        {"id": "CS-B", "x": 24.0, "y": 24.0, "z": 0.0}
+    ]
+
     def __init__(self, api_base_url: str, polling_interval: float = 5.0):
         self.api_base_url = api_base_url.rstrip('/')
         self.polling_interval = polling_interval
@@ -40,76 +39,114 @@ class GroundControlClient:
         except json.JSONDecodeError:
             logger.error(f"Failed to decode JSON response from {url}")
             return None
+
+    def _format_charging_stations(self) -> str:
+        """Formata a lista estática de postos de carregamento para a dashboard."""
+        output = ["\n--- POSTOS DE CARREGAMENTO ---"]
         
-    def _format_telemetry(self, latest_telemetry: Dict[str, Dict[str, Any]]) -> str:
-        """Formata a telemetria mais recente para exibição."""
-        if not latest_telemetry:
-            return "   [Nenhuma Telemetria Recebida]\n"
-        
-        output = ["\n--- ÚLTIMA TELEMETRIA (TS/ML) ---"]
-        for rid, data in latest_telemetry.items():
-            # Extrair campos customizados e garantir que são float/dict
-            temp = data.get("internal_temp_c", 0.0)
-            speed = data.get("current_speed_m_s", 0.0)
-            pos = data.get("position", {"x": 0.0, "y": 0.0})
-            batt = data.get("battery_level_pct", 0.0)
-            
+        for station in self.CHARGING_STATIONS:
             line = (
-                f"  > Rover {rid}: Estado: {data.get('status', 'N/A').upper()} | "
-                f"Bateria: {batt:.1f}% | "
-                f"Posição: ({pos['x']:.1f}, {pos['y']:.1f}) | "
-                f"Temp: {temp:.1f} °C | "
-                f"Velocidade: {speed:.1f} m/s"
+                f"  - Posto ID: {station['id']} | "
+                f"Posição (X,Y,Z): ({station['x']:.1f}, {station['y']:.1f}, {station['z']:.1f})"
             )
             output.append(line)
         return "\n".join(output)
         
-    def _format_rovers(self, rovers_status: Dict[str, Dict[str, Any]]) -> str:
-        """Formata o estado dos rovers (com base no TelemetryStore)."""
-        if not rovers_status:
+    def _format_rovers(self, rovers_data: Dict[str, Dict[str, Any]]) -> str:
+        """
+        Formata o estado dos rovers, consolidando toda a telemetria detalhada 
+        (Posição X, Y, Z, Velocidade, Bateria e Temperatura) nesta secção.
+        """
+        if not rovers_data:
             return "   [Nenhum Rover Ativo]\n"
             
         output = ["\n--- ESTADO DOS ROVERS ---"]
-        for rid, status in rovers_status.items():
-            # Os campos detalhados vêm diretamente do payload do API Server agora
+        for rid, status in rovers_data.items():
             batt = status.get('battery_level_pct', 0.0)
             temp = status.get('internal_temp_c', 0.0)
+            speed = status.get('current_speed_m_s', 0.0)
             
+            # Posição, obtida diretamente do payload do API Server (inclui Z)
+            pos = status.get('position', {"x": 0.0, "y": 0.0, "z": 0.0})
+            
+            # Lógica de Estado (IDLE, MOVING, IN_MISSION, COOLING, CHARGING)
+            state_raw = status.get('status', 'DESCONHECIDO').upper() # Usar 'status' detalhado da telemetria
+            if state_raw in ('CHARGING_TRAVEL', 'TRAVELING_TO_CHARGE', 'MOVING_TO_MISSION', 'MOVING'):
+                display_state = 'MOVING'
+            elif state_raw in ('IN_MISSION', 'RUNNING'):
+                display_state = 'IN_MISSION'
+            elif state_raw == 'COOLING_DOWN':
+                display_state = 'COOLING'
+            elif state_raw == 'CHARGING':
+                display_state = 'CHARGING'
+            else:
+                # IDLE para COMPLETED, IDLE, ERROR, UNKNOWN
+                display_state = 'IDLE' 
+            
+            # 1. Linha principal do Estado (Bateria e Temperatura)
             line = (
-                f"  - Rover ID: {rid} | ESTADO: {status.get('state', 'DESCONHECIDO').upper()} | "
-                f"Bateria: {batt:.1f}% | "
-                f"Temperatura: {temp:.1f}°C"
+                f"  - Rover ID: {rid} | ESTADO: {display_state} | Bateria: {batt:.1f}% | Temperatura: {temp:.1f}°C"
             )
+            # 2. Linha de Telemetria Detalhada (Posição XYZ e Velocidade)
+            telemetry_line = (
+                f"    -> Posição (X,Y,Z): ({pos.get('x', 0.0):.1f}, {pos.get('y', 0.0):.1f}, {pos.get('z', 0.0):.1f}) | "
+                f"Velocidade: {speed:.1f} m/s"
+            )
+            
             output.append(line)
+            output.append(telemetry_line)
+
         return "\n".join(output)
 
     def _format_missions(self, missions_list: List[Dict[str, Any]]) -> str:
-        """Formata a lista de missões (recebendo uma LISTA da API)."""
+        """Formata a lista de missões, incluindo a área (XYZ) e duração."""
         if not missions_list:
             return "   [Nenhuma Missão Criada]\n"
             
-        output = ["\n--- MISSÕES ---"]
+        # Alterado o cabeçalho
+        output = ["\n--- MISSÕES (Área & Duração) ---"]
         
-        # Iterar diretamente sobre a lista retornada pela API e ordenar
+        # Ordenação por estado e prioridade
         sorted_missions = sorted(missions_list, key=lambda m: (m.get('state', 'Z'), -m.get('priority', 0)))
         
         for mission in sorted_missions:
             mid = mission.get('mission_id', 'N/A')
             state = mission.get('state', 'N/A').upper()
             rover = mission.get('assigned_rover', 'N/A')
-            # O campo é progress_pct (corrigido na API)
             progress = mission.get('progress_pct', 0.0)
             task = mission.get('task', 'N/A')
             
+            # Extrair e formatar Área e Duração (agora disponíveis a partir do API Server)
+            area_data = mission.get('area')
+            duration_s = mission.get('max_duration_s') 
+            
+            if area_data and isinstance(area_data, dict):
+                # Incluir Z1 e Z2 na formatação
+                area_str = (
+                    f"Area: ({area_data.get('x1', 0.0):.1f}, {area_data.get('y1', 0.0):.1f}, {area_data.get('z1', 0.0):.1f}) "
+                    f"-> ({area_data.get('x2', 0.0):.1f}, {area_data.get('y2', 0.0):.1f}, {area_data.get('z2', 0.0):.1f})"
+                )
+            else:
+                area_str = "Area: N/A"
+                
+            duration_str = f"Duração Estimada: {duration_s:.1f}s" if duration_s is not None else "Duração: N/A"
+            
+            # Linha principal da Missão
             line = (
-                f"  - ID: {mid} | TAREFA: {task} | ESTADO: {state} | "
-                f"Rover: {rover} | Progresso: {progress:.1f}%"
+                f"  - ID: {mid} | TAREFA: {task} | ESTADO: {state} | Progresso: {progress:.1f}% | Rover: {rover}"
             )
+            # Linha de Detalhes (Área e Duração)
+            details_line = (
+                f"    -> {area_str} | {duration_str}"
+            )
+            
             output.append(line)
+            output.append(details_line)
+
         return "\n".join(output)
 
     def run(self):
-        """Loop principal de polling."""
+        """Loop principal de polling - Retornando à lógica sequencial de impressão."""
         while True:
             logger.info("Polling API...")
             
@@ -119,42 +156,30 @@ class GroundControlClient:
             # 2. Obter o estado agregado dos rovers (Retorna DICIONÁRIO)
             rovers_data = self._fetch_api('/api/rovers')
 
-            # 3. Obter a telemetria mais recente (Retorna DICIONÁRIO: {"latest_telemetry": {...}})
-            telemetry_data = self._fetch_api('/api/telemetry/latest')
-
             # --- Processamento e Exibição ---
             
-            # CORREÇÃO 1: Tratar a resposta de /api/missions como uma LISTA
             missions_list = missions_raw if isinstance(missions_raw, list) else []
-            
-            # CORREÇÃO 2: Tratar a resposta de /api/rovers como um DICIONÁRIO
             rovers_data_dict = rovers_data if isinstance(rovers_data, dict) else {}
-
-            # CORREÇÃO 3: Extrair a telemetria detalhada
-            latest_telemetry = telemetry_data.get('latest_telemetry', {}) if isinstance(telemetry_data, dict) else {}
             
             print("\n" + "="*50)
             print("         GROUND CONTROL DASHBOARD         ")
             print("="*50)
+            
+            # Exibir Postos de Carregamento
+            print(self._format_charging_stations())
 
-            # Exibir Missões
+            # Exibir Missões (com Área e Duração)
             if missions_list:
                 print(self._format_missions(missions_list))
             else:
                 print("\n--- MISSÕES ---\n   [Erro ao carregar ou Nenhuma Missão]")
 
-            # Exibir Estado dos Rovers
+            # Exibir Estado dos Rovers (com Telemetria Consolidada)
             if rovers_data_dict:
                 print(self._format_rovers(rovers_data_dict))
             else:
                 print("\n--- ESTADO DOS ROVERS ---\n   [Erro ao carregar ou Nenhum Rover Ativo]")
             
-            # Exibir Telemetria Detalhada
-            if latest_telemetry:
-                print(self._format_telemetry(latest_telemetry))
-            else:
-                print("\n--- ÚLTIMA TELEMETRIA (TS/ML) ---\n   [Erro ao carregar ou Nenhuma Telemetria]")
-
             print("="*50 + "\n")
             
             time.sleep(self.polling_interval)
@@ -164,6 +189,8 @@ if __name__ == "__main__":
     # Configuração explícita de logging para garantir output imediato
     import logging
     try:
+        from common import config
+        # Mantemos o nível WARNING para que apenas mensagens de INFO importantes e o output da dashboard apareçam.
         config.configure_logging(level="WARNING")
     except Exception:
         logging.basicConfig(level=logging.WARNING, format="%(asctime)s %(levelname)s [%(name)s] %(message)s")
