@@ -235,6 +235,7 @@ class RoverAgent(asyncio.DatagramProtocol):
                 logger.exception("RoverSim step failed")
 
             tel = self.rover.get_telemetry()
+            current_state = self.rover.state.upper() # Estado atual do rover
             
             # B) Prepara o PROGRESS (ML)
             tlvs = []
@@ -276,10 +277,23 @@ class RoverAgent(asyncio.DatagramProtocol):
                              mission_id, float(progress), status_log, temp_log)
 
 
-            # D) Condição de Finalização da Missão
+            # D) Condição de Finalização ou Pausa
+            if current_state in ("CHARGING_TRAVEL", "CHARGING", "COOLING", "ERROR"):
+                # ESTADOS DE PAUSA: A missão está suspensa. Interrompe o loop de progresso SEM enviar MISSION_COMPLETE.
+                # O loop de REQUEST MISSION irá recomeçar para lidar com o estado CHARGING (seja para terminar de carregar ou retomar a missão)
+                logger.warning("Mission %s paused/interrupted (State: %s). Stopping progress loop.", mission_id, current_state)
+                
+                # Reinicia o ciclo de pedido de missão
+                self._assigned_mission_id = None
+                self._progress_interval = 1.0 
+                
+                if self._request_task is None or self._request_task.done():
+                    self._request_task = self.loop.create_task(self._request_loop())
+                return # Exits the loop
+
             if self.rover.is_mission_complete():
                 
-                # Envio da mensagem MISSION_COMPLETE
+                # Envio da mensagem MISSION_COMPLETE (Apenas se COMPLETED for reportado)
                 tlvs = []
                 if mission_id:
                     tlvs.append((binary_proto.TLV_MISSION_ID, str(mission_id).encode("utf-8")))
@@ -291,7 +305,7 @@ class RoverAgent(asyncio.DatagramProtocol):
 
                 # Reinicia o ciclo de pedido de missão
                 self._assigned_mission_id = None
-                self._progress_interval = 1.0 # Reseta o intervalo de progresso
+                self._progress_interval = 1.0 
                 
                 if self._request_task is None or self._request_task.done():
                     self._request_task = self.loop.create_task(self._request_loop())
