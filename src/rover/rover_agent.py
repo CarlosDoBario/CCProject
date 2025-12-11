@@ -44,6 +44,7 @@ class RoverAgent(asyncio.DatagramProtocol):
         self._progress_task: Optional[asyncio.Task] = None
         self._request_task: Optional[asyncio.Task] = None
         self._assigned_mission_id: Optional[str] = None
+        self._interrupted_mission_id: Optional[str] = None # NOVO: ID da missão que foi pausada
         self._progress_interval: float = 1.0 # Intervalo de progressão por defeito
 
         self.seq = random.getrandbits(16)
@@ -107,12 +108,18 @@ class RoverAgent(asyncio.DatagramProtocol):
         # 2. TRATAMENTO DE MISSÃO ATRIBUÍDA
         if mtype == binary_proto.ML_MISSION_ASSIGN:
             
-            if self._assigned_mission_id:
-                logger.warning("Received MISSION_ASSIGN while already running mission %s. Ignoring new assignment.", self._assigned_mission_id)
+            mission_id = canonical.get("mission_id")
+            
+            if self._assigned_mission_id and self._assigned_mission_id != mission_id:
+                logger.warning("Received MISSION_ASSIGN for %s while already running mission %s. Ignoring new assignment.", mission_id, self._assigned_mission_id)
                 self.send_ack(server_msgid, addr) # Envia ACK mesmo assim
                 return
-
-            mission_id = canonical.get("mission_id")
+            
+            if self._assigned_mission_id == mission_id and not self._interrupted_mission_id:
+                 logger.info("Received re-ASSIGN for already running mission %s. Likely server retransmit. Acknowledge and ignore.", mission_id)
+                 self.send_ack(server_msgid, addr)
+                 return
+                 
             # Reconstroi a missão com todos os detalhes (params, area, task)
             mission_spec = mission_schema.mission_spec_from_tlvmap(tlvmap)
             
@@ -124,6 +131,7 @@ class RoverAgent(asyncio.DatagramProtocol):
             # B) Inicia a Missão e o Loop de Progresso
             try:
                 self._assigned_mission_id = mission_id
+                self._interrupted_mission_id = None # Limpa o sinal de interrupção
                 
                 # Cancela o loop de pedido (já temos missão)
                 if self._request_task and not self._request_task.done():
@@ -193,26 +201,87 @@ class RoverAgent(asyncio.DatagramProtocol):
             return 0
 
 
-    async def request_mission(self):
-        """Envia REQUEST_MISSION para o servidor."""
+    async def request_mission(self, resume_id: Optional[str] = None): # MODIFICADO
+        """Envia REQUEST_MISSION para o servidor, com a opção de pedir a retoma de uma missão."""
         tlvs = []
         caps = ",".join(["sampling", "imaging", "env"])
         tlvs.append((binary_proto.TLV_CAPABILITIES, caps.encode("utf-8")))
         
+        # Se resume_id estiver presente, adiciona-o ao pedido como um hint para o servidor
+        # (Assumindo que o servidor ML o interpreta como um pedido de retoma/re-atribuição)
+        if resume_id:
+            tlvs.append((binary_proto.TLV_MISSION_ID, str(resume_id).encode("utf-8")))
+        
         msgid = await self._send_ml_packet(binary_proto.ML_REQUEST_MISSION, tlvs)
         
         if msgid:
-            logger.info("Sent REQUEST_MISSION msgid=%s to %s", msgid, self.server)
+            log_msg = f"Sent REQUEST_MISSION (Resume: {resume_id}) msgid={msgid} to {self.server}"
+            logger.info(log_msg)
+
+    async def _send_maintenance_progress(self):
+        """Envia um PROGRESS de status de manutenção (sem mission_id)."""
+        tel = self.rover.get_telemetry()
+        tlvs: List[Tuple[int, bytes]] = []
+        
+        # Campos de telemetria principais
+        batt = tel.get("battery_level_pct")
+        if batt is not None:
+            tlvs.append(binary_proto.tlv_battery_level(int(batt)))
+            
+        pos = tel.get("position", None)
+        if pos:
+            tlvs.append(binary_proto.tlv_position(float(pos.get("x", 0.0)), float(pos.get("y", 0.0)), float(pos.get("z", 0.0))))
+
+        # Status detalhado via JSON
+        custom_params = {
+            "status": tel.get("status"),
+            "battery_level_pct": tel.get("battery_level_pct"),
+            "internal_temp_c": tel.get("internal_temp_c"),
+            "current_speed_m_s": tel.get("current_speed_m_s"),
+        }
+        tlvs.append((binary_proto.TLV_PARAMS_JSON, json.dumps(custom_params).encode("utf-8")))
+
+        msgid = await self._send_ml_packet(binary_proto.ML_PROGRESS, tlvs)
+        
+        if msgid:
+            logger.info("Sent MAINTENANCE PROGRESS (Status: %s | Batt: %.1f%% | Pos: %.1f,%.1f)", 
+                        tel.get("status", "N/A").upper(), batt, pos["x"], pos["y"])
 
     async def _request_loop(self):
-        """Repete REQUEST_MISSION até receber um ASSIGN."""
-        logger.info("Starting request loop (interval=%.1fs) to poll for missions", self.request_interval)
+        """Repete REQUEST_MISSION até receber um ASSIGN, e gere os estados de manutenção (CHARGING/COOLING/TRAVEL)."""
+        logger.info("Starting request/maintenance loop (interval=%.1fs) to poll for missions", self.request_interval)
         try:
+            # O loop só termina quando a tarefa é cancelada ou uma exceção ocorre
             while self._assigned_mission_id is None:
-                # Condição para evitar flooding e garantir que o rover está livre para aceitar missões
-                if self.rover.state in ("IDLE", "COMPLETED", "ERROR"):
-                    await self.request_mission()
+                
+                # A) Permite o avanço da simulação nos estados de manutenção
+                try:
+                    self.rover.step(self.request_interval) 
+                except Exception:
+                    logger.exception("RoverSim step failed in maintenance loop")
+                
+                new_state = self.rover.state.upper()
+                
+                # B) Lógica de Pedido de Missão (incluindo retoma)
+                if new_state in ("IDLE", "COMPLETED", "ERROR"):
+                    
+                    mission_to_request = self._interrupted_mission_id # Pede a missão interrompida se houver
+                    
+                    if mission_to_request:
+                        logger.info("Rover is ready to resume mission %s.", mission_to_request)
+                        await self.request_mission(mission_to_request) 
+                        self._interrupted_mission_id = None # Limpa o sinal após o pedido (espera pelo ASSIGN)
+                        
+                    else:
+                        # Só pede nova missão se for IDLE E não houver nada para retomar.
+                        await self.request_mission()
+                
+                # C) Se estiver num estado de manutenção (e não IDLE/Completed/RESUME_PENDING), envia PROGRESS (mesmo sem mission_id)
+                elif new_state in ("CHARGING_TRAVEL", "CHARGING", "COOLING"):
+                    await self._send_maintenance_progress()
+                
                 await asyncio.sleep(self.request_interval)
+
         except asyncio.CancelledError:
             logger.debug("_request_loop cancelled")
         except Exception:
@@ -238,7 +307,7 @@ class RoverAgent(asyncio.DatagramProtocol):
             current_state = self.rover.state.upper() # Estado atual do rover
             
             # B) Prepara o PROGRESS (ML)
-            tlvs = []
+            tlvs: List[Tuple[int, bytes]] = []
             if mission_id:
                 tlvs.append((binary_proto.TLV_MISSION_ID, str(mission_id).encode("utf-8")))
             
@@ -279,11 +348,11 @@ class RoverAgent(asyncio.DatagramProtocol):
 
             # D) Condição de Finalização ou Pausa
             if current_state in ("CHARGING_TRAVEL", "CHARGING", "COOLING", "ERROR"):
-                # ESTADOS DE PAUSA: A missão está suspensa. Interrompe o loop de progresso SEM enviar MISSION_COMPLETE.
-                # O loop de REQUEST MISSION irá recomeçar para lidar com o estado CHARGING (seja para terminar de carregar ou retomar a missão)
-                logger.warning("Mission %s paused/interrupted (State: %s). Stopping progress loop.", mission_id, current_state)
+                # ESTADOS DE PAUSA: A missão está suspensa. 
+                logger.warning("Mission %s paused/interrupted (State: %s). Stopping progress loop. Registering ID for resumption.", mission_id, current_state)
                 
-                # Reinicia o ciclo de pedido de missão
+                # CRITICAL FIX 3: Guarda o ID para pedir retoma e limpa o ID atribuído para re-entrar no _request_loop
+                self._interrupted_mission_id = mission_id
                 self._assigned_mission_id = None
                 self._progress_interval = 1.0 
                 
@@ -294,7 +363,7 @@ class RoverAgent(asyncio.DatagramProtocol):
             if self.rover.is_mission_complete():
                 
                 # Envio da mensagem MISSION_COMPLETE (Apenas se COMPLETED for reportado)
-                tlvs = []
+                tlvs: List[Tuple[int, bytes]] = []
                 if mission_id:
                     tlvs.append((binary_proto.TLV_MISSION_ID, str(mission_id).encode("utf-8")))
                 result = {"result": "success", "samples_collected": self.rover.samples_collected}
@@ -305,6 +374,7 @@ class RoverAgent(asyncio.DatagramProtocol):
 
                 # Reinicia o ciclo de pedido de missão
                 self._assigned_mission_id = None
+                self._interrupted_mission_id = None # Garante que não retoma
                 self._progress_interval = 1.0 
                 
                 if self._request_task is None or self._request_task.done():

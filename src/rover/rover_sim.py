@@ -41,6 +41,7 @@ class RoverSim:
         self.position = {"x": float(position[0]), "y": float(position[1]), "z": float(position[2])}
         self.state = "IDLE"  # IDLE, RUNNING, COMPLETED, ERROR, CHARGING_TRAVEL, CHARGING, COOLING, MOVING_TO_MISSION
         self.current_mission: Optional[Dict[str, Any]] = None
+        self._paused_mission_spec: Optional[Dict[str, Any]] = None # NOVO: Para guardar a missão interrompida
         self.progress_pct: float = 0.0
         self.samples_collected: int = 0
         self.battery_level_pct: float = 30.0 # Bateria inicial definida a 30%
@@ -107,13 +108,20 @@ class RoverSim:
         self.errors.append({"code": err_code, "description": description})
         self.state = "CHARGING_TRAVEL" 
         
-        # Encontrar a estação mais próxima
+        # 1. CRITICAL FIX: GUARDAR O ESTADO COMPLETO DA MISSÃO ATUAL (current_mission)
+        if self.current_mission and self.current_mission.get("task") not in ("travel_to_charge", "cooling"):
+             # Salva o progresso e a posição para a retomada
+            paused_spec = dict(self.current_mission)
+            paused_spec['progress_pct'] = self.progress_pct
+            paused_spec['elapsed_time'] = self._elapsed_on_mission
+            paused_spec['current_pos'] = dict(self.position) # Salva a posição de interrupção
+            self._paused_mission_spec = paused_spec
+        
+        # 2. Configurar a missão de emergência
         nearest_station = self._find_nearest_station(self.position)
         self.charging_station_position = nearest_station
         
-        # Cria missão de carregamento temporária
-        original_mission_id = self.current_mission.get("mission_id") if self.current_mission and self.current_mission.get("task") != "travel_to_charge" else None
-        self.current_mission = {"mission_id": f"EMERG-CHARGE-{time.time()}", "task": "travel_to_charge", "params": {"target_pos": self.charging_station_position}, "original_mission": original_mission_id}
+        self.current_mission = {"mission_id": f"EMERG-CHARGE-{time.time()}", "task": "travel_to_charge", "params": {"target_pos": self.charging_station_position}}
         self._elapsed_travel_time = 0.0
         self.current_speed_m_s = self.TRAVEL_SPEED
     
@@ -121,43 +129,80 @@ class RoverSim:
     def start_mission(self, mission_spec: Dict[str, Any]) -> None:
         """
         Inicia uma missão, verificando primeiro se é necessário viajar até à área de missão.
+        
+        Pode ser chamada para:
+        1. Iniciar uma nova missão.
+        2. Retomar uma missão pausada.
         """
+        # Se a bateria estiver demasiado baixa, inicia imediatamente o processo de carregamento
         if self.battery_level_pct < self.LOW_BATTERY_THRESHOLD_IDLE:
-            self.state = "IDLE" 
+            # Não pode aceitar a nova missão. Redireciona para o posto de carga.
+            self._do_redirect_to_charge(self.LOW_BATTERY_THRESHOLD_IDLE, is_running_mission=False) 
             return 
             
-        # 1. Determinar o Ponto de Partida da Missão (Centro da Área)
-        area = mission_spec.get("area")
-        if area:
-            target_x = (area.get("x1", 0.0) + area.get("x2", 0.0)) / 2.0
-            target_y = (area.get("y1", 0.0) + area.get("y2", 0.0)) / 2.0
-            target_z = (area.get("z1", 0.0) + area.get("z2", 0.0)) / 2.0
-        else:
-            target_x, target_y, target_z = 0.0, 0.0, 0.0
-
-        self.current_target = {"x": target_x, "y": target_y, "z": target_z}
-
-        # 2. Verificar Distância e Definir Estado Inicial
-        dx = self.position["x"] - self.current_target["x"]
-        dy = self.position["y"] - self.current_target["y"]
-        distance = math.sqrt(dx**2 + dy**2)
-        
         self.current_mission = dict(mission_spec)
-        
-        if distance > self.MOVE_THRESHOLD:
-            self.state = "MOVING_TO_MISSION"
-        else:
-            self.state = "RUNNING"
-        
-        self.progress_pct = 0.0
-        self.samples_collected = 0
         self.errors = []
-        self._elapsed_on_mission = 0.0
+        
+        # 1. TENTATIVA DE RETOMADA: Verifica se há dados de progresso na nova missão (usado para retomar)
+        is_resumption = 'elapsed_time' in mission_spec
+        
+        if is_resumption:
+            self._elapsed_on_mission = float(mission_spec.get('elapsed_time', 0.0))
+            self.progress_pct = float(mission_spec.get('progress_pct', 0.0))
+            
+            # Se a missão pausada guardou a posição de interrupção, usa-a como ponto de partida
+            if 'current_pos' in mission_spec:
+                 self.position = dict(mission_spec['current_pos'])
+            
+            # O target é o mesmo da missão original (centro da área)
+            area = mission_spec.get("area")
+            if area:
+                target_x = (area.get("x1", 0.0) + area.get("x2", 0.0)) / 2.0
+                target_y = (area.get("y1", 0.0) + area.get("y2", 0.0)) / 2.0
+                target_z = (area.get("z1", 0.0) + area.get("z2", 0.0)) / 2.0
+            else:
+                target_x, target_y, target_z = 0.0, 0.0, 0.0
+            
+            self.current_target = {"x": target_x, "y": target_y, "z": target_z}
+            
+        else:
+            # 2. Determinar o Ponto de Partida da Missão (Centro da Área)
+            area = mission_spec.get("area")
+            if area:
+                target_x = (area.get("x1", 0.0) + area.get("x2", 0.0)) / 2.0
+                target_y = (area.get("y1", 0.0) + area.get("y2", 0.0)) / 2.0
+                target_z = (area.get("z1", 0.0) + area.get("z2", 0.0)) / 2.0
+            else:
+                target_x, target_y, target_z = 0.0, 0.0, 0.0
+
+            self.current_target = {"x": target_x, "y": target_y, "z": target_z}
+            self.progress_pct = 0.0
+            self.samples_collected = 0
+            self._elapsed_on_mission = 0.0
+            
+            
+        # 3. Definir o tempo total da missão (necessário para calcular o progresso)
         self._mission_total_time = float(mission_spec.get("max_duration_s") or self._estimate_mission_total_time(mission_spec))
         if self._mission_total_time < 0.5:
             self._mission_total_time = 0.5
         if self._mission_total_time > 60.0:
             self._mission_total_time = 60.0
+            
+        # 4. Verificar Distância e Definir Estado Inicial (Movimento vs. Execução)
+        dx = self.position["x"] - self.current_target["x"]
+        dy = self.position["y"] - self.current_target["y"]
+        distance = math.sqrt(dx**2 + dy**2)
+        
+        if distance > self.MOVE_THRESHOLD and not is_resumption:
+            # Se for nova missão e estiver longe, move-se.
+            self.state = "MOVING_TO_MISSION"
+        elif self.progress_pct < 100.0:
+            # Se for retomada ou nova missão já perto, e não estiver completa, corre.
+            self.state = "RUNNING"
+        else:
+             # Caso a retomada chegue já a 100% (erro de estado), marca como completa.
+            self.state = "COMPLETED"
+        
 
     def step(self, elapsed_s: float = 1.0) -> None:
         """Advance the simulation by elapsed_s seconds."""
@@ -197,7 +242,16 @@ class RoverSim:
 
             # Verificação de Overheating (35°C)
             if self.internal_temp_c > self.MAX_TEMP:
+                # CRITICAL FIX 4: Salvar a missão pausada também aqui (se necessário)
+                if self.current_mission and self.current_mission.get("task") not in ("travel_to_charge", "cooling"):
+                    paused_spec = dict(self.current_mission)
+                    paused_spec['progress_pct'] = self.progress_pct
+                    paused_spec['elapsed_time'] = self._elapsed_on_mission
+                    paused_spec['current_pos'] = dict(self.position) 
+                    self._paused_mission_spec = paused_spec
+                
                 self.state = "COOLING" 
+                self.current_mission = {"mission_id": f"EMERG-COOL-{time.time()}", "task": "cooling"}
                 err = {"code": "TEMP-OVERHEAT", "description": f"Internal temp exceeded {self.MAX_TEMP:.1f}C. Mission paused for cooling."}
                 self.errors.append(err)
                 self.current_speed_m_s = 0.0
@@ -222,11 +276,10 @@ class RoverSim:
             if self.internal_temp_c <= self.INITIAL_TEMP: 
                 self.internal_temp_c = self.INITIAL_TEMP
                 
-                # Se havia uma missão a correr, retoma; senão, IDLE
-                if self.current_mission and self.current_mission.get("task") != "travel_to_charge" and self._elapsed_on_mission < self._mission_total_time:
-                    self.state = "RUNNING" 
-                else:
-                    self.state = "IDLE" 
+                # FIX: Ao arrefecer, volta para IDLE, confiando no Agente para pedir a retoma.
+                self.state = "IDLE" 
+                self.current_mission = None
+                self.errors = [] # Limpa os erros de temperatura
             return
             
         # ----------------------------------------------------
@@ -238,9 +291,11 @@ class RoverSim:
             if self.battery_level_pct >= 100.0:
                 self.battery_level_pct = 100.0
                 
-                # Após carregar, volta a IDLE (para o agente pedir a próxima missão)
+                # FIX: Ao carregar, volta para IDLE, confiando no Agente para pedir a retoma.
+                # A missão original pausada (M-0003) fica guardada em self._paused_mission_spec.
                 self.state = "IDLE"
-                    
+                
+                # A missão corrente (EMERG-CHARGE) é limpa. 
                 self.current_mission = None
                 self.errors = [] 
             return
@@ -313,7 +368,16 @@ class RoverSim:
 
             # 2. Verificação de Overheating (35°C)
             if self.internal_temp_c > self.MAX_TEMP:
+                 # CRITICAL FIX 5: Salvar o estado antes de pausar por temperatura
+                if self.current_mission and self.current_mission.get("task") not in ("travel_to_charge", "cooling"):
+                    paused_spec = dict(self.current_mission)
+                    paused_spec['progress_pct'] = self.progress_pct
+                    paused_spec['elapsed_time'] = self._elapsed_on_mission
+                    paused_spec['current_pos'] = dict(self.position) 
+                    self._paused_mission_spec = paused_spec
+                
                 self.state = "COOLING" 
+                self.current_mission = {"mission_id": f"EMERG-COOL-{time.time()}", "task": "cooling"}
                 err = {"code": "TEMP-OVERHEAT", "description": f"Internal temp exceeded {self.MAX_TEMP:.1f}C. Mission paused for cooling."}
                 self.errors.append(err)
                 self.current_speed_m_s = 0.0
@@ -365,6 +429,7 @@ class RoverSim:
             if self._elapsed_on_mission >= self._mission_total_time or self.progress_pct >= 100.0:
                 self.progress_pct = 100.0
                 self.state = "COMPLETED"
+                self.current_mission = None # Missão concluída é limpa
                 self.current_speed_m_s = 0.0
                 if task == "collect_samples":
                     self.samples_collected = int(params.get("sample_count", 1))
@@ -394,7 +459,7 @@ class RoverSim:
         
         return {
             "mission_id": (self.current_mission.get("mission_id") if self.current_mission else None),
-            "progress_pct": self.progress_pct, 
+            "progress_pct": round(self.progress_pct, 1), 
             "position": dict(self.position),
             "battery_level_pct": round(self.battery_level_pct, 1),
             "internal_temp_c": round(self.internal_temp_c, 1), 

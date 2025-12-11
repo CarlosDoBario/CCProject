@@ -463,7 +463,7 @@ class MissionStore:
         demos = [
             {"task": "capture_images", "area": {"x1": 10, "y1": 10, "z1": 0, "x2": 20, "y2": 20, "z2": 0}, "params": {"interval_s": 5, "frames": 60}, "priority": 1, "max_duration_s": 20.0, "update_interval_s": 1.0},
             {"task": "collect_samples", "area": {"x1": 30, "y1": 5, "z1": 0, "x2": 35, "y2": 10, "z2": 0}, "params": {"depth_mm": 50, "sample_count": 2}, "priority": 2, "max_duration_s": 15.0, "update_interval_s": 1.0},
-            {"task": "env_analysis", "area": {"x1": 100, "y1": 100, "z1": 0, "x2": 150, "y2": 150, "z2": 5}, "params": {"sensors": ["temp", "pressure"], "sampling_rate_s": 10}, "priority": 3, "max_duration_s": 20.0, "update_interval_s": 1.0},
+            {"task": "env_analysis", "area": {"x1": 85, "y1": 85, "z1": 0, "x2": 150, "y2": 150, "z2": 5}, "params": {"sensors": ["temp", "pressure"], "sampling_rate_s": 10}, "priority": 3, "max_duration_s": 20.0, "update_interval_s": 1.0},
         ]
         for m in demos:
             try:

@@ -1,0 +1,2802 @@
+{
+  "missions": {
+    "M-0001": {
+      "mission_id": "M-0001",
+      "task": "capture_images",
+      "area": {
+        "x1": 10.0,
+        "y1": 10.0,
+        "z1": 0.0,
+        "x2": 20.0,
+        "y2": 20.0,
+        "z2": 0.0
+      },
+      "params": {
+        "interval_s": 5,
+        "frames": 60
+      },
+      "priority": 1,
+      "max_duration_s": 20.0,
+      "update_interval_s": 1.0,
+      "created_at": "2025-12-11T19:36:08+00:00",
+      "state": "COMPLETED",
+      "assigned_rover": "R-001",
+      "assigned_at": "2025-12-11T19:38:27+00:00",
+      "history": [
+        {
+          "ts": "2025-12-11T19:38:27+00:00",
+          "type": "ASSIGNED",
+          "rover": "R-001"
+        },
+        {
+          "ts": "2025-12-11T19:38:28+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0001",
+            "position": {
+              "x": 36.132442474365234,
+              "y": 21.0093936920166,
+              "z": 0.0
+            },
+            "battery_level_pct": 94.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 25.2,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 36.13244063182954,
+                "y": 21.009393687102317,
+                "z": 0.0
+              },
+              "battery_level_pct": 94.8
+            },
+            "internal_temp_c": 25.2,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:38:29+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0001",
+            "position": {
+              "x": 35.17057418823242,
+              "y": 20.735870361328125,
+              "z": 0.0
+            },
+            "battery_level_pct": 94.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 25.4,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 35.170575414080005,
+                "y": 20.73586982546746,
+                "z": 0.0
+              },
+              "battery_level_pct": 94.6
+            },
+            "internal_temp_c": 25.4,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:38:30+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0001",
+            "position": {
+              "x": 34.208709716796875,
+              "y": 20.462345123291016,
+              "z": 0.0
+            },
+            "battery_level_pct": 94.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 25.6,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 34.20871019633047,
+                "y": 20.462345963832604,
+                "z": 0.0
+              },
+              "battery_level_pct": 94.4
+            },
+            "internal_temp_c": 25.6,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:38:31+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0001",
+            "position": {
+              "x": 33.24684524536133,
+              "y": 20.18882179260254,
+              "z": 0.0
+            },
+            "battery_level_pct": 94.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 25.8,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 33.24684497858094,
+                "y": 20.188822102197747,
+                "z": 0.0
+              },
+              "battery_level_pct": 94.2
+            },
+            "internal_temp_c": 25.8,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:38:32+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0001",
+            "position": {
+              "x": 32.28498077392578,
+              "y": 19.915298461914062,
+              "z": 0.0
+            },
+            "battery_level_pct": 94.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 26.0,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 32.284979760831405,
+                "y": 19.91529824056289,
+                "z": 0.0
+              },
+              "battery_level_pct": 94.0
+            },
+            "internal_temp_c": 26.0,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:38:33+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0001",
+            "position": {
+              "x": 31.3231143951416,
+              "y": 19.641775131225586,
+              "z": 0.0
+            },
+            "battery_level_pct": 93.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 26.2,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 31.32311454308187,
+                "y": 19.641774378928034,
+                "z": 0.0
+              },
+              "battery_level_pct": 93.8
+            },
+            "internal_temp_c": 26.2,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:38:34+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0001",
+            "position": {
+              "x": 30.361249923706055,
+              "y": 19.368249893188477,
+              "z": 0.0
+            },
+            "battery_level_pct": 93.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 26.4,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 30.361249325332338,
+                "y": 19.368250517293177,
+                "z": 0.0
+              },
+              "battery_level_pct": 93.6
+            },
+            "internal_temp_c": 26.4,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:38:35+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0001",
+            "position": {
+              "x": 29.399383544921875,
+              "y": 19.0947265625,
+              "z": 0.0
+            },
+            "battery_level_pct": 93.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 26.6,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 29.399384107582804,
+                "y": 19.09472665565832,
+                "z": 0.0
+              },
+              "battery_level_pct": 93.4
+            },
+            "internal_temp_c": 26.6,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:38:36+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0001",
+            "position": {
+              "x": 28.437519073486328,
+              "y": 18.821203231811523,
+              "z": 0.0
+            },
+            "battery_level_pct": 93.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 26.8,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 28.43751888983327,
+                "y": 18.821202794023467,
+                "z": 0.0
+              },
+              "battery_level_pct": 93.2
+            },
+            "internal_temp_c": 26.8,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:38:37+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0001",
+            "position": {
+              "x": 27.47565460205078,
+              "y": 18.547677993774414,
+              "z": 0.0
+            },
+            "battery_level_pct": 93.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 27.0,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 27.475653672083737,
+                "y": 18.54767893238861,
+                "z": 0.0
+              },
+              "battery_level_pct": 93.0
+            },
+            "internal_temp_c": 27.0,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:38:38+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0001",
+            "position": {
+              "x": 26.5137882232666,
+              "y": 18.274154663085938,
+              "z": 0.0
+            },
+            "battery_level_pct": 92.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 27.2,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 26.513788454334204,
+                "y": 18.274155070753757,
+                "z": 0.0
+              },
+              "battery_level_pct": 92.8
+            },
+            "internal_temp_c": 27.2,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:38:39+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0001",
+            "position": {
+              "x": 25.551923751831055,
+              "y": 18.00063133239746,
+              "z": 0.0
+            },
+            "battery_level_pct": 92.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 27.4,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 25.55192323658467,
+                "y": 18.0006312091189,
+                "z": 0.0
+              },
+              "battery_level_pct": 92.6
+            },
+            "internal_temp_c": 27.4,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:38:40+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0001",
+            "position": {
+              "x": 24.590057373046875,
+              "y": 17.727108001708984,
+              "z": 0.0
+            },
+            "battery_level_pct": 92.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 27.6,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 24.590058018835137,
+                "y": 17.727107347484047,
+                "z": 0.0
+              },
+              "battery_level_pct": 92.4
+            },
+            "internal_temp_c": 27.6,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:38:41+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0001",
+            "position": {
+              "x": 23.628192901611328,
+              "y": 17.453582763671875,
+              "z": 0.0
+            },
+            "battery_level_pct": 92.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 27.8,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 23.628192801085603,
+                "y": 17.45358348584919,
+                "z": 0.0
+              },
+              "battery_level_pct": 92.2
+            },
+            "internal_temp_c": 27.8,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:38:42+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0001",
+            "position": {
+              "x": 22.66632843017578,
+              "y": 17.1800594329834,
+              "z": 0.0
+            },
+            "battery_level_pct": 92.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 28.0,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 22.66632758333607,
+                "y": 17.180059624214337,
+                "z": 0.0
+              },
+              "battery_level_pct": 92.0
+            },
+            "internal_temp_c": 28.0,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:38:43+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0001",
+            "position": {
+              "x": 21.7044620513916,
+              "y": 16.906536102294922,
+              "z": 0.0
+            },
+            "battery_level_pct": 91.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 28.2,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 21.704462365586537,
+                "y": 16.90653576257948,
+                "z": 0.0
+              },
+              "battery_level_pct": 91.8
+            },
+            "internal_temp_c": 28.2,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:38:44+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0001",
+            "position": {
+              "x": 20.742597579956055,
+              "y": 16.633012771606445,
+              "z": 0.0
+            },
+            "battery_level_pct": 91.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 28.4,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 20.742597147837003,
+                "y": 16.633011900944627,
+                "z": 0.0
+              },
+              "battery_level_pct": 91.6
+            },
+            "internal_temp_c": 28.4,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:38:45+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0001",
+            "position": {
+              "x": 19.780731201171875,
+              "y": 16.359487533569336,
+              "z": 0.0
+            },
+            "battery_level_pct": 91.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 28.6,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 19.78073193008747,
+                "y": 16.35948803930977,
+                "z": 0.0
+              },
+              "battery_level_pct": 91.4
+            },
+            "internal_temp_c": 28.6,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:38:46+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0001",
+            "position": {
+              "x": 15.0,
+              "y": 15.0,
+              "z": 0.0
+            },
+            "battery_level_pct": 91.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 28.8,
+              "current_speed_m_s": 0.8,
+              "status": "running",
+              "errors": [],
+              "position": {
+                "x": 15.0,
+                "y": 15.0,
+                "z": 0.0
+              },
+              "battery_level_pct": 91.2
+            },
+            "internal_temp_c": 28.8,
+            "current_speed_m_s": 0.8,
+            "status": "running",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:38:47+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0001",
+            "position": {
+              "x": 15.020209312438965,
+              "y": 15.00198745727539,
+              "z": 0.0
+            },
+            "battery_level_pct": 91.0,
+            "progress_pct": 6.699999809265137,
+            "params": {
+              "internal_temp_c": 29.0,
+              "current_speed_m_s": 0.8,
+              "status": "running",
+              "errors": [],
+              "position": {
+                "x": 15.020209745639601,
+                "y": 15.001987523048495,
+                "z": 0.0
+              },
+              "battery_level_pct": 91.1
+            },
+            "internal_temp_c": 29.0,
+            "current_speed_m_s": 0.8,
+            "status": "running",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:38:48+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0001",
+            "position": {
+              "x": 14.987347602844238,
+              "y": 14.993446350097656,
+              "z": 0.0
+            },
+            "battery_level_pct": 90.0,
+            "progress_pct": 13.300000190734863,
+            "params": {
+              "internal_temp_c": 29.2,
+              "current_speed_m_s": 0.8,
+              "status": "running",
+              "errors": [],
+              "position": {
+                "x": 14.987347445271137,
+                "y": 14.993446790315582,
+                "z": 0.0
+              },
+              "battery_level_pct": 90.9
+            },
+            "internal_temp_c": 29.2,
+            "current_speed_m_s": 0.8,
+            "status": "running",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:38:49+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0001",
+            "position": {
+              "x": 14.995427131652832,
+              "y": 14.968602180480957,
+              "z": 0.0
+            },
+            "battery_level_pct": 90.0,
+            "progress_pct": 20.0,
+            "params": {
+              "internal_temp_c": 29.4,
+              "current_speed_m_s": 0.8,
+              "status": "running",
+              "errors": [],
+              "position": {
+                "x": 14.995427468280566,
+                "y": 14.968602577110076,
+                "z": 0.0
+              },
+              "battery_level_pct": 90.8
+            },
+            "internal_temp_c": 29.4,
+            "current_speed_m_s": 0.8,
+            "status": "running",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:38:50+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0001",
+            "position": {
+              "x": 14.98283863067627,
+              "y": 14.986577987670898,
+              "z": 0.0
+            },
+            "battery_level_pct": 90.0,
+            "progress_pct": 26.700000762939453,
+            "params": {
+              "internal_temp_c": 29.6,
+              "current_speed_m_s": 0.8,
+              "status": "running",
+              "errors": [],
+              "position": {
+                "x": 14.982838259340488,
+                "y": 14.986578321438662,
+                "z": 0.0
+              },
+              "battery_level_pct": 90.7
+            },
+            "internal_temp_c": 29.6,
+            "current_speed_m_s": 0.8,
+            "status": "running",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:38:51+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0001",
+            "position": {
+              "x": 14.9789457321167,
+              "y": 14.977890014648438,
+              "z": 0.0
+            },
+            "battery_level_pct": 90.0,
+            "progress_pct": 33.29999923706055,
+            "params": {
+              "internal_temp_c": 29.8,
+              "current_speed_m_s": 0.8,
+              "status": "running",
+              "errors": [],
+              "position": {
+                "x": 14.978945825506894,
+                "y": 14.97788999175479,
+                "z": 0.0
+              },
+              "battery_level_pct": 90.5
+            },
+            "internal_temp_c": 29.8,
+            "current_speed_m_s": 0.8,
+            "status": "running",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:38:52+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0001",
+            "position": {
+              "x": 14.947022438049316,
+              "y": 14.997149467468262,
+              "z": 0.0
+            },
+            "battery_level_pct": 90.0,
+            "progress_pct": 40.0,
+            "params": {
+              "internal_temp_c": 30.0,
+              "current_speed_m_s": 0.8,
+              "status": "running",
+              "errors": [],
+              "position": {
+                "x": 14.947022401803324,
+                "y": 14.99714931628165,
+                "z": 0.0
+              },
+              "battery_level_pct": 90.4
+            },
+            "internal_temp_c": 30.0,
+            "current_speed_m_s": 0.8,
+            "status": "running",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:38:53+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0001",
+            "position": {
+              "x": 14.961018562316895,
+              "y": 14.993823051452637,
+              "z": 0.0
+            },
+            "battery_level_pct": 90.0,
+            "progress_pct": 46.70000076293945,
+            "params": {
+              "internal_temp_c": 30.2,
+              "current_speed_m_s": 0.8,
+              "status": "running",
+              "errors": [],
+              "position": {
+                "x": 14.961018145511442,
+                "y": 14.993823105205081,
+                "z": 0.0
+              },
+              "battery_level_pct": 90.3
+            },
+            "internal_temp_c": 30.2,
+            "current_speed_m_s": 0.8,
+            "status": "running",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:38:54+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0001",
+            "position": {
+              "x": 14.937424659729004,
+              "y": 15.009654998779297,
+              "z": 0.0
+            },
+            "battery_level_pct": 90.0,
+            "progress_pct": 53.29999923706055,
+            "params": {
+              "internal_temp_c": 30.4,
+              "current_speed_m_s": 0.8,
+              "status": "running",
+              "errors": [],
+              "position": {
+                "x": 14.937424992121683,
+                "y": 15.009654844985839,
+                "z": 0.0
+              },
+              "battery_level_pct": 90.1
+            },
+            "internal_temp_c": 30.4,
+            "current_speed_m_s": 0.8,
+            "status": "running",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:38:55+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0001",
+            "position": {
+              "x": 14.946497917175293,
+              "y": 15.024523735046387,
+              "z": 0.0
+            },
+            "battery_level_pct": 90.0,
+            "progress_pct": 60.0,
+            "params": {
+              "internal_temp_c": 30.6,
+              "current_speed_m_s": 0.8,
+              "status": "running",
+              "errors": [],
+              "position": {
+                "x": 14.946497830455527,
+                "y": 15.024523900402194,
+                "z": 0.0
+              },
+              "battery_level_pct": 90.0
+            },
+            "internal_temp_c": 30.6,
+            "current_speed_m_s": 0.8,
+            "status": "running",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:38:56+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0001",
+            "position": {
+              "x": 14.915040016174316,
+              "y": 15.010512351989746,
+              "z": 0.0
+            },
+            "battery_level_pct": 89.0,
+            "progress_pct": 66.69999694824219,
+            "params": {
+              "internal_temp_c": 30.8,
+              "current_speed_m_s": 0.8,
+              "status": "running",
+              "errors": [],
+              "position": {
+                "x": 14.915039587682118,
+                "y": 15.010512252501192,
+                "z": 0.0
+              },
+              "battery_level_pct": 89.9
+            },
+            "internal_temp_c": 30.8,
+            "current_speed_m_s": 0.8,
+            "status": "running",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:38:57+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0001",
+            "position": {
+              "x": 14.924535751342773,
+              "y": 15.020440101623535,
+              "z": 0.0
+            },
+            "battery_level_pct": 89.0,
+            "progress_pct": 73.30000305175781,
+            "params": {
+              "internal_temp_c": 31.0,
+              "current_speed_m_s": 0.8,
+              "status": "running",
+              "errors": [],
+              "position": {
+                "x": 14.924535633428354,
+                "y": 15.020439780363343,
+                "z": 0.0
+              },
+              "battery_level_pct": 89.7
+            },
+            "internal_temp_c": 31.0,
+            "current_speed_m_s": 0.8,
+            "status": "running",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:38:58+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0001",
+            "position": {
+              "x": 14.896513938903809,
+              "y": 14.998849868774414,
+              "z": 0.0
+            },
+            "battery_level_pct": 89.0,
+            "progress_pct": 80.0,
+            "params": {
+              "internal_temp_c": 31.2,
+              "current_speed_m_s": 0.8,
+              "status": "running",
+              "errors": [],
+              "position": {
+                "x": 14.896514066310669,
+                "y": 14.998849579456044,
+                "z": 0.0
+              },
+              "battery_level_pct": 89.6
+            },
+            "internal_temp_c": 31.2,
+            "current_speed_m_s": 0.8,
+            "status": "running",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:38:59+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0001",
+            "position": {
+              "x": 14.927016258239746,
+              "y": 15.01894760131836,
+              "z": 0.0
+            },
+            "battery_level_pct": 89.0,
+            "progress_pct": 86.69999694824219,
+            "params": {
+              "internal_temp_c": 31.4,
+              "current_speed_m_s": 0.8,
+              "status": "running",
+              "errors": [],
+              "position": {
+                "x": 14.927016151659297,
+                "y": 15.01894743101496,
+                "z": 0.0
+              },
+              "battery_level_pct": 89.5
+            },
+            "internal_temp_c": 31.4,
+            "current_speed_m_s": 0.8,
+            "status": "running",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:39:00+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0001",
+            "position": {
+              "x": 14.913152694702148,
+              "y": 14.994782447814941,
+              "z": 0.0
+            },
+            "battery_level_pct": 89.0,
+            "progress_pct": 93.30000305175781,
+            "params": {
+              "internal_temp_c": 31.6,
+              "current_speed_m_s": 0.8,
+              "status": "running",
+              "errors": [],
+              "position": {
+                "x": 14.913153079503617,
+                "y": 14.994782692691974,
+                "z": 0.0
+              },
+              "battery_level_pct": 89.3
+            },
+            "internal_temp_c": 31.6,
+            "current_speed_m_s": 0.8,
+            "status": "running",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:39:01+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0001",
+            "position": {
+              "x": 14.905586242675781,
+              "y": 15.01096248626709,
+              "z": 0.0
+            },
+            "battery_level_pct": 89.0,
+            "progress_pct": 100.0,
+            "params": {
+              "internal_temp_c": 31.8,
+              "current_speed_m_s": 0.0,
+              "status": "completed",
+              "errors": [],
+              "position": {
+                "x": 14.905586537962451,
+                "y": 15.010962244717735,
+                "z": 0.0
+              },
+              "battery_level_pct": 89.2
+            },
+            "internal_temp_c": 31.8,
+            "current_speed_m_s": 0.0,
+            "status": "completed",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:39:01+00:00",
+          "type": "COMPLETE",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0001",
+            "params": {
+              "result": "success",
+              "samples_collected": 60
+            },
+            "result": "success",
+            "samples_collected": 60
+          }
+        }
+      ],
+      "last_progress_pct": 100.0,
+      "completed_at": "2025-12-11T19:39:01+00:00"
+    },
+    "M-0002": {
+      "mission_id": "M-0002",
+      "task": "collect_samples",
+      "area": {
+        "x1": 30.0,
+        "y1": 5.0,
+        "z1": 0.0,
+        "x2": 35.0,
+        "y2": 10.0,
+        "z2": 0.0
+      },
+      "params": {
+        "depth_mm": 50,
+        "sample_count": 2
+      },
+      "priority": 2,
+      "max_duration_s": 15.0,
+      "update_interval_s": 1.0,
+      "created_at": "2025-12-11T19:36:08+00:00",
+      "state": "IN_PROGRESS",
+      "assigned_rover": "R-001",
+      "assigned_at": "2025-12-11T19:37:52+00:00",
+      "history": [
+        {
+          "ts": "2025-12-11T19:37:52+00:00",
+          "type": "ASSIGNED",
+          "rover": "R-001"
+        },
+        {
+          "ts": "2025-12-11T19:37:53+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0002",
+            "position": {
+              "x": 44.683773040771484,
+              "y": 44.05131530761719,
+              "z": 0.0
+            },
+            "battery_level_pct": 99.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 30.2,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 44.68377223398316,
+                "y": 44.05131670194949,
+                "z": 0.0
+              },
+              "battery_level_pct": 99.8
+            },
+            "internal_temp_c": 30.2,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:37:54+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0002",
+            "position": {
+              "x": 44.36754608154297,
+              "y": 43.10263442993164,
+              "z": 0.0
+            },
+            "battery_level_pct": 99.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 30.4,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 44.367544467966326,
+                "y": 43.10263340389898,
+                "z": 0.0
+              },
+              "battery_level_pct": 99.6
+            },
+            "internal_temp_c": 30.4,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:37:55+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0002",
+            "position": {
+              "x": 44.05131530761719,
+              "y": 42.15394973754883,
+              "z": 0.0
+            },
+            "battery_level_pct": 99.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 30.6,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 44.05131670194949,
+                "y": 42.153950105848466,
+                "z": 0.0
+              },
+              "battery_level_pct": 99.4
+            },
+            "internal_temp_c": 30.6,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:37:56+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0002",
+            "position": {
+              "x": 43.73508834838867,
+              "y": 41.205265045166016,
+              "z": 0.0
+            },
+            "battery_level_pct": 99.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 30.8,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 43.73508893593265,
+                "y": 41.205266807797955,
+                "z": 0.0
+              },
+              "battery_level_pct": 99.2
+            },
+            "internal_temp_c": 30.8,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:37:57+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0002",
+            "position": {
+              "x": 43.418861389160156,
+              "y": 40.25658416748047,
+              "z": 0.0
+            },
+            "battery_level_pct": 99.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 31.0,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 43.418861169915814,
+                "y": 40.25658350974744,
+                "z": 0.0
+              },
+              "battery_level_pct": 99.0
+            },
+            "internal_temp_c": 31.0,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:37:58+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0002",
+            "position": {
+              "x": 43.10263442993164,
+              "y": 39.307899475097656,
+              "z": 0.0
+            },
+            "battery_level_pct": 98.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 31.2,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 43.10263340389898,
+                "y": 39.30790021169693,
+                "z": 0.0
+              },
+              "battery_level_pct": 98.8
+            },
+            "internal_temp_c": 31.2,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:37:59+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0002",
+            "position": {
+              "x": 42.786407470703125,
+              "y": 38.35921859741211,
+              "z": 0.0
+            },
+            "battery_level_pct": 98.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 31.4,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 42.78640563788214,
+                "y": 38.35921691364642,
+                "z": 0.0
+              },
+              "battery_level_pct": 98.6
+            },
+            "internal_temp_c": 31.4,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:38:00+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0002",
+            "position": {
+              "x": 42.470176696777344,
+              "y": 37.4105339050293,
+              "z": 0.0
+            },
+            "battery_level_pct": 98.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 31.6,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 42.4701778718653,
+                "y": 37.41053361559591,
+                "z": 0.0
+              },
+              "battery_level_pct": 98.4
+            },
+            "internal_temp_c": 31.6,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:38:01+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0002",
+            "position": {
+              "x": 42.15394973754883,
+              "y": 36.461849212646484,
+              "z": 0.0
+            },
+            "battery_level_pct": 98.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 31.8,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 42.153950105848466,
+                "y": 36.4618503175454,
+                "z": 0.0
+              },
+              "battery_level_pct": 98.2
+            },
+            "internal_temp_c": 31.8,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:38:02+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0002",
+            "position": {
+              "x": 41.83772277832031,
+              "y": 35.51316833496094,
+              "z": 0.0
+            },
+            "battery_level_pct": 98.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 32.0,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 41.83772233983163,
+                "y": 35.51316701949489,
+                "z": 0.0
+              },
+              "battery_level_pct": 98.0
+            },
+            "internal_temp_c": 32.0,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:38:03+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0002",
+            "position": {
+              "x": 41.5214958190918,
+              "y": 34.564483642578125,
+              "z": 0.0
+            },
+            "battery_level_pct": 97.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 32.2,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 41.52149457381479,
+                "y": 34.564483721444375,
+                "z": 0.0
+              },
+              "battery_level_pct": 97.8
+            },
+            "internal_temp_c": 32.2,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:38:04+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0002",
+            "position": {
+              "x": 41.205265045166016,
+              "y": 33.61579895019531,
+              "z": 0.0
+            },
+            "battery_level_pct": 97.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 32.4,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 41.205266807797955,
+                "y": 33.615800423393864,
+                "z": 0.0
+              },
+              "battery_level_pct": 97.6
+            },
+            "internal_temp_c": 32.4,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:38:05+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0002",
+            "position": {
+              "x": 40.8890380859375,
+              "y": 32.667118072509766,
+              "z": 0.0
+            },
+            "battery_level_pct": 97.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 32.6,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 40.88903904178112,
+                "y": 32.66711712534335,
+                "z": 0.0
+              },
+              "battery_level_pct": 97.4
+            },
+            "internal_temp_c": 32.6,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:38:06+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0002",
+            "position": {
+              "x": 40.572811126708984,
+              "y": 31.718433380126953,
+              "z": 0.0
+            },
+            "battery_level_pct": 97.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 32.8,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 40.57281127576428,
+                "y": 31.718433827292838,
+                "z": 0.0
+              },
+              "battery_level_pct": 97.2
+            },
+            "internal_temp_c": 32.8,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:38:07+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0002",
+            "position": {
+              "x": 40.25658416748047,
+              "y": 30.769750595092773,
+              "z": 0.0
+            },
+            "battery_level_pct": 97.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 33.0,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 40.25658350974744,
+                "y": 30.769750529242323,
+                "z": 0.0
+              },
+              "battery_level_pct": 97.0
+            },
+            "internal_temp_c": 33.0,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:38:08+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0002",
+            "position": {
+              "x": 39.94035720825195,
+              "y": 29.821067810058594,
+              "z": 0.0
+            },
+            "battery_level_pct": 96.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 33.2,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 39.940355743730606,
+                "y": 29.821067231191808,
+                "z": 0.0
+              },
+              "battery_level_pct": 96.8
+            },
+            "internal_temp_c": 33.2,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:38:09+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0002",
+            "position": {
+              "x": 39.62412643432617,
+              "y": 28.87238311767578,
+              "z": 0.0
+            },
+            "battery_level_pct": 96.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 33.4,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 39.62412797771377,
+                "y": 28.872383933141293,
+                "z": 0.0
+              },
+              "battery_level_pct": 96.6
+            },
+            "internal_temp_c": 33.4,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:38:10+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0002",
+            "position": {
+              "x": 39.307899475097656,
+              "y": 27.9237003326416,
+              "z": 0.0
+            },
+            "battery_level_pct": 96.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 33.6,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 39.30790021169693,
+                "y": 27.92370063509078,
+                "z": 0.0
+              },
+              "battery_level_pct": 96.4
+            },
+            "internal_temp_c": 33.6,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:38:11+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0002",
+            "position": {
+              "x": 38.99167251586914,
+              "y": 26.975017547607422,
+              "z": 0.0
+            },
+            "battery_level_pct": 96.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 33.8,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 38.991672445680095,
+                "y": 26.975017337040263,
+                "z": 0.0
+              },
+              "battery_level_pct": 96.2
+            },
+            "internal_temp_c": 33.8,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:38:12+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0002",
+            "position": {
+              "x": 38.675445556640625,
+              "y": 26.026334762573242,
+              "z": 0.0
+            },
+            "battery_level_pct": 96.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 34.0,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 38.67544467966326,
+                "y": 26.02633403898975,
+                "z": 0.0
+              },
+              "battery_level_pct": 96.0
+            },
+            "internal_temp_c": 34.0,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:38:13+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0002",
+            "position": {
+              "x": 38.35921859741211,
+              "y": 25.07765007019043,
+              "z": 0.0
+            },
+            "battery_level_pct": 95.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 34.2,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 38.35921691364642,
+                "y": 25.077650740939234,
+                "z": 0.0
+              },
+              "battery_level_pct": 95.8
+            },
+            "internal_temp_c": 34.2,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:38:14+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0002",
+            "position": {
+              "x": 38.04298782348633,
+              "y": 24.12896728515625,
+              "z": 0.0
+            },
+            "battery_level_pct": 95.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 34.4,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 38.042989147629584,
+                "y": 24.12896744288872,
+                "z": 0.0
+              },
+              "battery_level_pct": 95.6
+            },
+            "internal_temp_c": 34.4,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:38:15+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0002",
+            "position": {
+              "x": 37.72676086425781,
+              "y": 23.18028450012207,
+              "z": 0.0
+            },
+            "battery_level_pct": 95.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 34.6,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 37.72676138161275,
+                "y": 23.180284144838204,
+                "z": 0.0
+              },
+              "battery_level_pct": 95.4
+            },
+            "internal_temp_c": 34.6,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:38:16+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0002",
+            "position": {
+              "x": 37.4105339050293,
+              "y": 22.23160171508789,
+              "z": 0.0
+            },
+            "battery_level_pct": 95.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 34.8,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 37.41053361559591,
+                "y": 22.23160084678769,
+                "z": 0.0
+              },
+              "battery_level_pct": 95.2
+            },
+            "internal_temp_c": 34.8,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:38:17+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0002",
+            "position": {
+              "x": 37.09430694580078,
+              "y": 21.282917022705078,
+              "z": 0.0
+            },
+            "battery_level_pct": 95.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 35.0,
+              "current_speed_m_s": 0.0,
+              "status": "cooling_down",
+              "errors": [
+                {
+                  "code": "TEMP-OVERHEAT",
+                  "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+                }
+              ],
+              "position": {
+                "x": 37.09430584957907,
+                "y": 21.282917548737174,
+                "z": 0.0
+              },
+              "battery_level_pct": 95.0
+            },
+            "internal_temp_c": 35.0,
+            "current_speed_m_s": 0.0,
+            "status": "cooling_down",
+            "errors": [
+              {
+                "code": "TEMP-OVERHEAT",
+                "description": "Internal temp exceeded 35.0C. Mission paused for cooling."
+              }
+            ]
+          }
+        }
+      ],
+      "last_progress_pct": 0.0
+    },
+    "M-0003": {
+      "mission_id": "M-0003",
+      "task": "env_analysis",
+      "area": {
+        "x1": 85.0,
+        "y1": 85.0,
+        "z1": 0.0,
+        "x2": 150.0,
+        "y2": 150.0,
+        "z2": 5.0
+      },
+      "params": {
+        "sensors": [
+          "temp",
+          "pressure"
+        ],
+        "sampling_rate_s": 10
+      },
+      "priority": 3,
+      "max_duration_s": 20.0,
+      "update_interval_s": 1.0,
+      "created_at": "2025-12-11T19:36:08+00:00",
+      "state": "IN_PROGRESS",
+      "assigned_rover": "R-001",
+      "assigned_at": "2025-12-11T19:36:15+00:00",
+      "history": [
+        {
+          "ts": "2025-12-11T19:36:15+00:00",
+          "type": "ASSIGNED",
+          "rover": "R-001"
+        },
+        {
+          "ts": "2025-12-11T19:36:16+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 65.70710754394531,
+              "y": 65.70710754394531,
+              "z": 0.0
+            },
+            "battery_level_pct": 29.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 25.2,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 65.70710678118655,
+                "y": 65.70710678118655,
+                "z": 0.0
+              },
+              "battery_level_pct": 29.8
+            },
+            "internal_temp_c": 25.2,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:36:17+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 66.41421508789062,
+              "y": 66.41421508789062,
+              "z": 0.0
+            },
+            "battery_level_pct": 29.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 25.4,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 66.4142135623731,
+                "y": 66.4142135623731,
+                "z": 0.0
+              },
+              "battery_level_pct": 29.6
+            },
+            "internal_temp_c": 25.4,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:36:18+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 67.12132263183594,
+              "y": 67.12132263183594,
+              "z": 0.0
+            },
+            "battery_level_pct": 29.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 25.6,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 67.12132034355966,
+                "y": 67.12132034355966,
+                "z": 0.0
+              },
+              "battery_level_pct": 29.4
+            },
+            "internal_temp_c": 25.6,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:36:19+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 67.82843017578125,
+              "y": 67.82843017578125,
+              "z": 0.0
+            },
+            "battery_level_pct": 29.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 25.8,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 67.82842712474621,
+                "y": 67.82842712474621,
+                "z": 0.0
+              },
+              "battery_level_pct": 29.2
+            },
+            "internal_temp_c": 25.8,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:36:20+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 68.53553771972656,
+              "y": 68.53553771972656,
+              "z": 0.0
+            },
+            "battery_level_pct": 29.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 26.0,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 68.53553390593277,
+                "y": 68.53553390593277,
+                "z": 0.0
+              },
+              "battery_level_pct": 29.0
+            },
+            "internal_temp_c": 26.0,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:36:21+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 69.24263763427734,
+              "y": 69.24263763427734,
+              "z": 0.0
+            },
+            "battery_level_pct": 28.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 26.2,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 69.24264068711932,
+                "y": 69.24264068711932,
+                "z": 0.0
+              },
+              "battery_level_pct": 28.8
+            },
+            "internal_temp_c": 26.2,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:36:22+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 69.94974517822266,
+              "y": 69.94974517822266,
+              "z": 0.0
+            },
+            "battery_level_pct": 28.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 26.4,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 69.94974746830587,
+                "y": 69.94974746830587,
+                "z": 0.0
+              },
+              "battery_level_pct": 28.6
+            },
+            "internal_temp_c": 26.4,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:36:23+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 70.65685272216797,
+              "y": 70.65685272216797,
+              "z": 0.0
+            },
+            "battery_level_pct": 28.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 26.6,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 70.65685424949243,
+                "y": 70.65685424949243,
+                "z": 0.0
+              },
+              "battery_level_pct": 28.4
+            },
+            "internal_temp_c": 26.6,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:36:24+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 71.36396026611328,
+              "y": 71.36396026611328,
+              "z": 0.0
+            },
+            "battery_level_pct": 28.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 26.8,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 71.36396103067898,
+                "y": 71.36396103067898,
+                "z": 0.0
+              },
+              "battery_level_pct": 28.2
+            },
+            "internal_temp_c": 26.8,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:36:25+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 72.0710678100586,
+              "y": 72.0710678100586,
+              "z": 0.0
+            },
+            "battery_level_pct": 28.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 27.0,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 72.07106781186553,
+                "y": 72.07106781186553,
+                "z": 0.0
+              },
+              "battery_level_pct": 28.0
+            },
+            "internal_temp_c": 27.0,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:36:26+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 72.7781753540039,
+              "y": 72.7781753540039,
+              "z": 0.0
+            },
+            "battery_level_pct": 27.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 27.2,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 72.77817459305209,
+                "y": 72.77817459305209,
+                "z": 0.0
+              },
+              "battery_level_pct": 27.8
+            },
+            "internal_temp_c": 27.2,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:36:27+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 73.48528289794922,
+              "y": 73.48528289794922,
+              "z": 0.0
+            },
+            "battery_level_pct": 27.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 27.4,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 73.48528137423864,
+                "y": 73.48528137423864,
+                "z": 0.0
+              },
+              "battery_level_pct": 27.6
+            },
+            "internal_temp_c": 27.4,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:36:28+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 74.19239044189453,
+              "y": 74.19239044189453,
+              "z": 0.0
+            },
+            "battery_level_pct": 27.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 27.6,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 74.19238815542519,
+                "y": 74.19238815542519,
+                "z": 0.0
+              },
+              "battery_level_pct": 27.4
+            },
+            "internal_temp_c": 27.6,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:36:29+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 74.89949798583984,
+              "y": 74.89949798583984,
+              "z": 0.0
+            },
+            "battery_level_pct": 27.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 27.8,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 74.89949493661175,
+                "y": 74.89949493661175,
+                "z": 0.0
+              },
+              "battery_level_pct": 27.2
+            },
+            "internal_temp_c": 27.8,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:36:30+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 75.60660552978516,
+              "y": 75.60660552978516,
+              "z": 0.0
+            },
+            "battery_level_pct": 27.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 28.0,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 75.6066017177983,
+                "y": 75.6066017177983,
+                "z": 0.0
+              },
+              "battery_level_pct": 27.0
+            },
+            "internal_temp_c": 28.0,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:36:31+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 76.31370544433594,
+              "y": 76.31370544433594,
+              "z": 0.0
+            },
+            "battery_level_pct": 26.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 28.2,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 76.31370849898485,
+                "y": 76.31370849898485,
+                "z": 0.0
+              },
+              "battery_level_pct": 26.8
+            },
+            "internal_temp_c": 28.2,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:36:32+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 77.02081298828125,
+              "y": 77.02081298828125,
+              "z": 0.0
+            },
+            "battery_level_pct": 26.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 28.4,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 77.0208152801714,
+                "y": 77.0208152801714,
+                "z": 0.0
+              },
+              "battery_level_pct": 26.6
+            },
+            "internal_temp_c": 28.4,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:36:33+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 77.72792053222656,
+              "y": 77.72792053222656,
+              "z": 0.0
+            },
+            "battery_level_pct": 26.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 28.6,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 77.72792206135796,
+                "y": 77.72792206135796,
+                "z": 0.0
+              },
+              "battery_level_pct": 26.4
+            },
+            "internal_temp_c": 28.6,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:36:34+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 78.43502807617188,
+              "y": 78.43502807617188,
+              "z": 0.0
+            },
+            "battery_level_pct": 26.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 28.8,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 78.43502884254451,
+                "y": 78.43502884254451,
+                "z": 0.0
+              },
+              "battery_level_pct": 26.2
+            },
+            "internal_temp_c": 28.8,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:36:35+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 79.14213562011719,
+              "y": 79.14213562011719,
+              "z": 0.0
+            },
+            "battery_level_pct": 26.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 29.0,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 79.14213562373106,
+                "y": 79.14213562373106,
+                "z": 0.0
+              },
+              "battery_level_pct": 26.0
+            },
+            "internal_temp_c": 29.0,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:36:36+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 79.8492431640625,
+              "y": 79.8492431640625,
+              "z": 0.0
+            },
+            "battery_level_pct": 25.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 29.2,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 79.84924240491762,
+                "y": 79.84924240491762,
+                "z": 0.0
+              },
+              "battery_level_pct": 25.8
+            },
+            "internal_temp_c": 29.2,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:36:37+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 80.55635070800781,
+              "y": 80.55635070800781,
+              "z": 0.0
+            },
+            "battery_level_pct": 25.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 29.4,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 80.55634918610417,
+                "y": 80.55634918610417,
+                "z": 0.0
+              },
+              "battery_level_pct": 25.6
+            },
+            "internal_temp_c": 29.4,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:36:38+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 81.26345825195312,
+              "y": 81.26345825195312,
+              "z": 0.0
+            },
+            "battery_level_pct": 25.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 29.6,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 81.26345596729072,
+                "y": 81.26345596729072,
+                "z": 0.0
+              },
+              "battery_level_pct": 25.4
+            },
+            "internal_temp_c": 29.6,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:36:39+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 81.97056579589844,
+              "y": 81.97056579589844,
+              "z": 0.0
+            },
+            "battery_level_pct": 25.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 29.8,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 81.97056274847728,
+                "y": 81.97056274847728,
+                "z": 0.0
+              },
+              "battery_level_pct": 25.2
+            },
+            "internal_temp_c": 29.8,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:36:40+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 82.67767333984375,
+              "y": 82.67767333984375,
+              "z": 0.0
+            },
+            "battery_level_pct": 25.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 30.0,
+              "current_speed_m_s": 1.0,
+              "status": "moving",
+              "errors": [],
+              "position": {
+                "x": 82.67766952966383,
+                "y": 82.67766952966383,
+                "z": 0.0
+              },
+              "battery_level_pct": 25.0
+            },
+            "internal_temp_c": 30.0,
+            "current_speed_m_s": 1.0,
+            "status": "moving",
+            "errors": []
+          }
+        },
+        {
+          "ts": "2025-12-11T19:36:41+00:00",
+          "type": "PROGRESS",
+          "rover": "R-001",
+          "payload": {
+            "mission_id": "M-0003",
+            "position": {
+              "x": 82.67767333984375,
+              "y": 82.67767333984375,
+              "z": 0.0
+            },
+            "battery_level_pct": 24.0,
+            "progress_pct": 0.0,
+            "params": {
+              "internal_temp_c": 30.0,
+              "current_speed_m_s": 1.0,
+              "status": "traveling_to_charge",
+              "errors": [
+                {
+                  "code": "BAT-PAUSE-CHARGE",
+                  "description": "Battery critically low (24.8%). Redirecting to charge."
+                }
+              ],
+              "position": {
+                "x": 82.67766952966383,
+                "y": 82.67766952966383,
+                "z": 0.0
+              },
+              "battery_level_pct": 24.8
+            },
+            "internal_temp_c": 30.0,
+            "current_speed_m_s": 1.0,
+            "status": "traveling_to_charge",
+            "errors": [
+              {
+                "code": "BAT-PAUSE-CHARGE",
+                "description": "Battery critically low (24.8%). Redirecting to charge."
+              }
+            ]
+          }
+        }
+      ],
+      "last_progress_pct": 0.0
+    }
+  },
+  "rovers": {
+    "R-001": {
+      "rover_id": "R-001",
+      "address": {
+        "ip": "127.0.0.1",
+        "port": 60594
+      },
+      "last_seen": "2025-12-11T19:39:01+00:00",
+      "state": "IDLE",
+      "battery_level_pct": 89.0,
+      "internal_temp_c": 31.8,
+      "current_speed_m_s": 0.0,
+      "position": {
+        "x": 14.905586242675781,
+        "y": 15.01096248626709,
+        "z": 0.0
+      },
+      "last_telemetry_full": {
+        "status": "completed",
+        "battery_level_pct": 89.0,
+        "internal_temp_c": 31.8,
+        "current_speed_m_s": 0.0,
+        "position": {
+          "x": 14.905586242675781,
+          "y": 15.01096248626709,
+          "z": 0.0
+        },
+        "timestamp_ms": 1765481941774
+      }
+    }
+  },
+  "_next_mission_seq": 4
+}
