@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """
-Rover agent que integra RoverSim + ML missionLink client + (opcional) criação de missões via API
-e envio de telemetria TCP.
+Rover agent que integra RoverSim + ML missionLink client.
 
-Nota: vem com correção importante — ao receber MISSION_ASSIGN o agente envia
-um ML_ACK confirmando o msgid do servidor. Isto evita retransmits e undeliverable_assign.
+Função: Este agente é o orquestrador do Rover. Liga-se ao ML Server (UDP) para pedir/receber
+missões e controla o RoverSim, reportando o progresso de volta.
 """
 from __future__ import annotations
 
@@ -16,18 +15,13 @@ import random
 import socket
 import struct
 import time
+import threading
 from typing import Any, Dict, Optional, Tuple, List
 
-from common import binary_proto, config, utils
+from common import binary_proto, config, utils, mission_schema
 from rover.rover_sim import RoverSim
 
 logger = utils.get_logger("rover.agent")
-
-# Only import requests when needed (so agent can run without requests if not creating missions)
-try:
-    import requests  # type: ignore
-except Exception:
-    requests = None  # type: ignore
 
 
 DEFAULT_TASKS = ["capture_images", "collect_samples", "env_analysis"]
@@ -38,16 +32,11 @@ class RoverAgent(asyncio.DatagramProtocol):
         self,
         rover_id: str,
         server: Tuple[str, int],
-        interval: float = 1.0,
-        exit_on_complete: bool = False,
-        request_interval: float = 5.0,
-        telemetry_enabled: bool = False,
-        telemetry_addr: Tuple[str, int] = ("127.0.0.1", config.TELEMETRY_PORT),
+        # O interval é agora o intervalo de REQUEST_MISSION, não de progressão
+        request_interval: float = 5.0, 
     ):
         self.rover_id = rover_id
         self.server = server
-        self.interval = interval
-        self.exit_on_complete = exit_on_complete
         self.request_interval = request_interval
 
         self.transport = None
@@ -55,13 +44,17 @@ class RoverAgent(asyncio.DatagramProtocol):
         self._progress_task: Optional[asyncio.Task] = None
         self._request_task: Optional[asyncio.Task] = None
         self._assigned_mission_id: Optional[str] = None
+        self._progress_interval: float = 1.0 # Intervalo de progressão por defeito
 
         self.seq = random.getrandbits(16)
-
-        # telemetry TCP
-        self.telemetry_enabled = telemetry_enabled
-        self.telemetry_addr = telemetry_addr
-        self._telemetry_writer: Optional[asyncio.StreamWriter] = None
+        self.loop = None
+        
+        # Variáveis para retransmissão ML
+        # pending: msgid -> (packet, created_at, attempts)
+        self.pending: Dict[int, Tuple[bytes, float, int]] = {}
+        self._lock = threading.Lock()
+        self._task_retransmit: Optional[asyncio.Task] = None
+        self._last_acks: Dict[int, bytes] = {} # Deduplicação de ACKs recebidos
 
     def connection_made(self, transport):
         self.transport = transport
@@ -70,11 +63,14 @@ class RoverAgent(asyncio.DatagramProtocol):
             logger.info("UDP socket bound at %s", sockname)
         except Exception:
             logger.debug("Could not get transport sockname")
-        loop = asyncio.get_event_loop()
-        # start request loop and (lazy) telemetry connection
-        self._request_task = loop.create_task(self._request_loop())
-        if self.telemetry_enabled:
-            loop.create_task(self._ensure_telemetry_connection())
+        
+        self.loop = asyncio.get_event_loop()
+        
+        # Inicia o loop de retransmissão
+        self._task_retransmit = self.loop.create_task(self._retransmit_loop())
+        
+        # Inicia o loop de pedido de missão
+        self._request_task = self.loop.create_task(self._request_loop())
 
     def datagram_received(self, data: bytes, addr: Tuple[str, int]):
         try:
@@ -88,312 +84,271 @@ class RoverAgent(asyncio.DatagramProtocol):
         tlvmap = parsed.get("tlvs", {})
         canonical = binary_proto.tlv_to_canonical(tlvmap)
 
-        # Extract server msgid (numeric) if present
         server_msgid = None
         try:
             server_msgid = int(header.get("msgid")) if header.get("msgid") is not None else None
         except Exception:
             server_msgid = None
 
-        if mtype == binary_proto.ML_MISSION_ASSIGN:
-            mission_id = canonical.get("mission_id")
-            params = {}
-            pj = canonical.get("params")
-            if pj:
-                try:
-                    params = json.loads(pj)
-                except Exception:
-                    try:
-                        params = json.loads(pj.decode("utf-8") if isinstance(pj, (bytes, bytearray)) else str(pj))
-                    except Exception:
-                        params = {}
-            logger.info("Received MISSION_ASSIGN %s params=%s", mission_id, params)
-
-            # --- SEND ACK for the incoming MISSION_ASSIGN so server knows it was delivered ---
-            try:
-                ack_val = int(server_msgid or 0) & 0xFFFFFFFFFFFFFFFF
-                ack_tlv = (binary_proto.TLV_ACKED_MSG_ID, struct.pack(">Q", ack_val))
-                ack_pkt = binary_proto.pack_ml_datagram(binary_proto.ML_ACK, self.rover_id, [ack_tlv], msgid=random.getrandbits(48))
-                if self.transport:
-                    try:
-                        self.transport.sendto(ack_pkt, addr)
-                        logger.debug("Sent ACK for assign msgid=%s to %s", server_msgid, addr)
-                    except Exception:
-                        logger.exception("Failed to send ACK for assign to %s", addr)
-            except Exception:
-                logger.exception("Error while building/sending ACK for MISSION_ASSIGN")
-
-            # --------------------------------------------------------------------------
-
-            mission_spec = {"mission_id": mission_id, "task": params.get("task", ""), "params": params}
-            try:
-                self._assigned_mission_id = mission_id
-                if self._request_task and not self._request_task.done():
-                    self._request_task.cancel()
-                    self._request_task = None
-                self.rover.start_mission(mission_spec)
-                if self._progress_task is None or self._progress_task.done():
-                    self._progress_task = asyncio.get_event_loop().create_task(self._progress_loop())
-            except Exception:
-                logger.exception("Failed to start mission in RoverSim")
-
-        elif mtype == binary_proto.ML_ACK:
+        # 1. TRATAMENTO DE ACKs (Resposta do Servidor às nossas mensagens)
+        if mtype == binary_proto.ML_ACK:
             tlv_ack = tlvmap.get(binary_proto.TLV_ACKED_MSG_ID, [])
             if tlv_ack:
                 try:
                     acked = struct.unpack(">Q", tlv_ack[0])[0]
-                    logger.info("Received ACK for outgoing msg %s", acked)
+                    with self._lock:
+                        if acked in self.pending:
+                            self.pending.pop(acked, None)
+                            logger.info("Received ACK for outgoing msg %s", acked)
                 except Exception:
                     pass
+            return
+
+        # 2. TRATAMENTO DE MISSÃO ATRIBUÍDA
+        if mtype == binary_proto.ML_MISSION_ASSIGN:
+            
+            if self._assigned_mission_id:
+                logger.warning("Received MISSION_ASSIGN while already running mission %s. Ignoring new assignment.", self._assigned_mission_id)
+                self.send_ack(server_msgid, addr) # Envia ACK mesmo assim
+                return
+
+            mission_id = canonical.get("mission_id")
+            # Reconstroi a missão com todos os detalhes (params, area, task)
+            mission_spec = mission_schema.mission_spec_from_tlvmap(tlvmap)
+            
+            logger.info("Received MISSION_ASSIGN %s task=%s", mission_id, mission_spec.get('task'))
+
+            # A) Envia ACK de volta (Fiabilidade)
+            self.send_ack(server_msgid, addr)
+
+            # B) Inicia a Missão e o Loop de Progresso
+            try:
+                self._assigned_mission_id = mission_id
+                
+                # Cancela o loop de pedido (já temos missão)
+                if self._request_task and not self._request_task.done():
+                    self._request_task.cancel()
+                    self._request_task = None
+                
+                # Define o intervalo de progresso da missão (padrão 1.0s se não definido)
+                # OBS: O campo 'update_interval_s' é lido do MissionStore (nave_mae/mission_store.py)
+                self._progress_interval = mission_spec.get("params", {}).get("update_interval_s", 1.0)
+                
+                self.rover.start_mission(mission_spec)
+                
+                # Inicia o loop de progresso (que chama RoverSim.step)
+                if self._progress_task is None or self._progress_task.done():
+                    self._progress_task = self.loop.create_task(self._progress_loop())
+            except Exception:
+                logger.exception("Failed to start mission in RoverSim")
+
         elif mtype == binary_proto.ML_ERROR:
             logger.warning("ML ERROR: %s", binary_proto.tlv_to_canonical(tlvmap).get("errors"))
         else:
             logger.debug("Unhandled ML msgtype %s", mtype)
 
-    async def _send_request_once(self):
+    def send_ack(self, acked_msgid: int, addr: Tuple[str, int]) -> None:
+        """Envia ACK para uma mensagem recebida (pode ser chamada de forma síncrona)."""
+        if acked_msgid is None or not self.transport:
+            return
+        
+        ack_val = int(acked_msgid) & 0xFFFFFFFFFFFFFFFF
+        ack_tlv = (binary_proto.TLV_ACKED_MSG_ID, struct.pack(">Q", ack_val))
+        ack_pkt = binary_proto.pack_ml_datagram(binary_proto.ML_ACK, self.rover_id, [ack_tlv], msgid=random.getrandbits(48))
+
+        try:
+            self.transport.sendto(ack_pkt, addr)
+            logger.debug("Sent ACK for msgid=%s to %s", acked_msgid, addr)
+        except Exception:
+            logger.exception("Failed to send ACK to %s", addr)
+
+    async def _send_ml_packet(self, msg_type: int, tlvs: List[Tuple[int, bytes]], flags: int = 0) -> int:
+        """Helper para criar e enviar um pacote ML com fiabilidade."""
         self.seq = (self.seq + 1) & 0xFFFFFFFF
         msgid = random.getrandbits(48)
-        tlvs = []
-        caps = ",".join(["sampling", "imaging", "env"])
-        tlvs.append((binary_proto.TLV_CAPABILITIES, caps.encode("utf-8")))
+        
         pkt = binary_proto.pack_ml_datagram(
-            binary_proto.ML_REQUEST_MISSION,
+            msg_type,
             self.rover_id,
             tlvs,
-            flags=binary_proto.FLAG_ACK_REQUESTED,
+            flags=flags | binary_proto.FLAG_ACK_REQUESTED, # Sempre pede ACK para garantir fiabilidade
             seqnum=self.seq,
             msgid=msgid,
         )
+        
+        if len(pkt) > getattr(config, "ML_MAX_DATAGRAM_SIZE", 1200):
+            logger.error("Packet too large (%d bytes) - not sent", len(pkt))
+            return 0
+            
+        with self._lock:
+            self.pending[int(msgid)] = (pkt, time.time(), 1)
+            
         try:
-            if self.transport:
-                self.transport.sendto(pkt, self.server)
-                logger.info("Sent REQUEST_MISSION msgid=%s to %s", msgid, self.server)
+            self.transport.sendto(pkt, self.server)
+            return msgid
         except Exception:
-            logger.exception("Failed to send REQUEST_MISSION")
+            logger.exception("Failed to send ML packet")
+            with self._lock:
+                 self.pending.pop(int(msgid), None)
+            return 0
+
+
+    async def request_mission(self):
+        """Envia REQUEST_MISSION para o servidor."""
+        tlvs = []
+        caps = ",".join(["sampling", "imaging", "env"])
+        tlvs.append((binary_proto.TLV_CAPABILITIES, caps.encode("utf-8")))
+        
+        msgid = await self._send_ml_packet(binary_proto.ML_REQUEST_MISSION, tlvs)
+        
+        if msgid:
+            logger.info("Sent REQUEST_MISSION msgid=%s to %s", msgid, self.server)
 
     async def _request_loop(self):
-        """Repeat REQUEST_MISSION until we receive an ASSIGN."""
-        logger.info("Starting request loop (interval=%ss) to poll for missions", self.request_interval)
+        """Repete REQUEST_MISSION até receber um ASSIGN."""
+        logger.info("Starting request loop (interval=%.1fs) to poll for missions", self.request_interval)
         try:
             while self._assigned_mission_id is None:
-                await self._send_request_once()
+                # Condição para evitar flooding e garantir que o rover está livre para aceitar missões
+                if self.rover.state in ("IDLE", "COMPLETED", "ERROR"):
+                    await self.request_mission()
                 await asyncio.sleep(self.request_interval)
         except asyncio.CancelledError:
             logger.debug("_request_loop cancelled")
         except Exception:
             logger.exception("Error in _request_loop")
 
+
     async def _progress_loop(self):
-        logger.info("Starting progress loop for mission %s (interval=%s)", self._assigned_mission_id, self.interval)
-        while True:
-            await asyncio.sleep(self.interval)
+        """Executa a simulação (step) e envia PROGRESS (ML) na frequência da missão."""
+        mission_id = self._assigned_mission_id
+        interval = self._progress_interval
+        logger.info("Starting progress loop for mission %s (interval=%.1fs)", mission_id, interval)
+        
+        while mission_id == self._assigned_mission_id:
+            await asyncio.sleep(interval)
+            
+            # A) Executa um passo de simulação
             try:
-                self.rover.step(self.interval)
+                self.rover.step(interval)
             except Exception:
                 logger.exception("RoverSim step failed")
 
             tel = self.rover.get_telemetry()
-            mission_id = tel.get("mission_id") or self._assigned_mission_id
-            progress = float(tel.get("progress_pct", 0.0) or 0.0)
-
+            
+            # B) Prepara o PROGRESS (ML)
             tlvs = []
             if mission_id:
                 tlvs.append((binary_proto.TLV_MISSION_ID, str(mission_id).encode("utf-8")))
-            tlvs.append(binary_proto.tlv_progress(progress))
+            
+            # 1. Campos principais obrigatórios (convertidos para TLV dedicado)
+            progress = tel.get("progress_pct", 0.0) 
             pos = tel.get("position", None)
-            if pos:
-                tlvs.append(
-                    binary_proto.tlv_position(float(pos.get("x", 0.0)), float(pos.get("y", 0.0)), float(pos.get("z", 0.0)))
-                )
             batt = tel.get("battery_level_pct")
+
+            if progress is not None:
+                tlvs.append(binary_proto.tlv_progress(float(progress)))
+            if pos:
+                tlvs.append(binary_proto.tlv_position(float(pos.get("x", 0.0)), float(pos.get("y", 0.0)), float(pos.get("z", 0.0))))
             if batt is not None:
                 tlvs.append(binary_proto.tlv_battery_level(int(batt)))
-            if "internal_temp_c" in tel:
-                params = {"internal_temp_c": tel["internal_temp_c"], "status": tel.get("status"), "errors": tel.get("errors", [])}
-                tlvs.append((binary_proto.TLV_PARAMS_JSON, json.dumps(params).encode("utf-8")))
+            
+            # 2. Campos de Telemetria Customizados (Velocidade e Temperatura) via TLV_PARAMS_JSON
+            custom_params = {
+                "internal_temp_c": tel.get("internal_temp_c"),
+                "current_speed_m_s": tel.get("current_speed_m_s"),
+                "status": tel.get("status"),
+                "errors": tel.get("errors", []),
+                # Inclui a posição e bateria no JSON também, caso os TLVs dedicados falhem
+                "position": tel.get("position"),
+                "battery_level_pct": tel.get("battery_level_pct")
+            }
+            tlvs.append((binary_proto.TLV_PARAMS_JSON, json.dumps(custom_params).encode("utf-8")))
 
-            msgid = random.getrandbits(48)
-            pkt = binary_proto.pack_ml_datagram(
-                binary_proto.ML_PROGRESS,
-                self.rover_id,
-                tlvs,
-                flags=binary_proto.FLAG_ACK_REQUESTED,
-                seqnum=self.seq,
-                msgid=msgid,
-            )
-            try:
-                if self.transport:
-                    self.transport.sendto(pkt, self.server)
-                    logger.info("Sent PROGRESS %s pct=%.1f", mission_id, progress)
-            except Exception:
-                logger.exception("Failed to send PROGRESS")
+            # C) Envia PROGRESS
+            msgid = await self._send_ml_packet(binary_proto.ML_PROGRESS, tlvs)
+            
+            if msgid:
+                 # Log mais detalhado
+                 status_log = self.rover.state.upper()
+                 temp_log = tel.get("internal_temp_c", 0.0)
+                 logger.info("Sent PROGRESS %s pct=%.1f (Status: %s | Temp: %.1f)", 
+                             mission_id, float(progress), status_log, temp_log)
 
-            # Note: telemetry JSON over raw TCP is NOT compatible with the TelemetryServer framing
-            # in this project. If you use --telemetry you'll get frame/connection errors.
-            # For now we don't send telemetry JSON by default; enable only when implementing the
-            # server-side framing or a proper HTTP telemetry ingestion endpoint.
 
-            # Completion condition
-            if self.rover.is_mission_complete() and (self.rover.state == "COMPLETED" or self.rover.state in ("CHARGING_TRAVEL", "CHARGING")):
+            # D) Condição de Finalização da Missão
+            if self.rover.is_mission_complete():
+                
+                # Envio da mensagem MISSION_COMPLETE
                 tlvs = []
                 if mission_id:
                     tlvs.append((binary_proto.TLV_MISSION_ID, str(mission_id).encode("utf-8")))
                 result = {"result": "success", "samples_collected": self.rover.samples_collected}
                 tlvs.append((binary_proto.TLV_PARAMS_JSON, json.dumps(result).encode("utf-8")))
-                complete_msgid = random.getrandbits(48)
-                complete_pkt = binary_proto.pack_ml_datagram(
-                    binary_proto.ML_MISSION_COMPLETE,
-                    self.rover_id,
-                    tlvs,
-                    flags=binary_proto.FLAG_ACK_REQUESTED,
-                    seqnum=self.seq,
-                    msgid=complete_msgid,
-                )
-                try:
-                    if self.transport:
-                        self.transport.sendto(complete_pkt, self.server)
-                        logger.info("Sent MISSION_COMPLETE %s", mission_id)
-                except Exception:
-                    logger.exception("Failed to send MISSION_COMPLETE")
+                
+                await self._send_ml_packet(binary_proto.ML_MISSION_COMPLETE, tlvs)
+                logger.info("Sent MISSION_COMPLETE %s (State: %s)", mission_id, self.rover.state)
 
-                if self.exit_on_complete:
-                    logger.info("Mission complete and exit_on_complete set - stopping agent")
-                    try:
-                        if self.transport:
-                            self.transport.close()
-                    except Exception:
-                        pass
-                    asyncio.get_event_loop().stop()
-                    return
-                else:
-                    self._assigned_mission_id = None
-                    logger.info("Mission finished; restarting request loop for new missions")
-                    if self._request_task is None or self._request_task.done():
-                        self._request_task = asyncio.get_event_loop().create_task(self._request_loop())
-                    return
+                # Reinicia o ciclo de pedido de missão
+                self._assigned_mission_id = None
+                self._progress_interval = 1.0 # Reseta o intervalo de progresso
+                
+                if self._request_task is None or self._request_task.done():
+                    self._request_task = self.loop.create_task(self._request_loop())
+                return
 
-    def error_received(self, exc):
-        logger.exception("Socket error: %s", exc)
+
+    async def _retransmit_loop(self):
+        """Loop de fundo para retransmissão de pacotes pendentes (garantia ML)."""
+        while True:
+            now = time.time()
+            to_remove = []
+            with self._lock:
+                items = list(self.pending.items())
+            for msg_id, (pkt, created, attempts) in items:
+                # Usa backoff exponencial
+                timeout = config.TIMEOUT_TX_INITIAL * (config.BACKOFF_FACTOR ** (attempts - 1))
+                if now - created > timeout:
+                    if attempts <= config.N_RETX:
+                        try:
+                            self.transport.sendto(pkt, self.server)
+                            with self._lock:
+                                self.pending[msg_id] = (pkt, now, attempts + 1)
+                            logger.warning("Retransmit pending msg %s attempt=%d", msg_id, attempts + 1)
+                        except Exception:
+                            logger.exception("Failed retransmit")
+                    else:
+                        logger.error("Retries exhausted for pending msg %s", msg_id)
+                        to_remove.append(msg_id)
+            with self._lock:
+                for r in to_remove:
+                    self.pending.pop(r, None)
+            await asyncio.sleep(0.5)
+
 
     def connection_lost(self, exc):
         logger.info("UDP connection lost")
+        # Cancelar todas as tasks em caso de perda de conexão
         if self._progress_task and not self._progress_task.done():
             self._progress_task.cancel()
         if self._request_task and not self._request_task.done():
             self._request_task.cancel()
-        if self._telemetry_writer:
-            try:
-                self._telemetry_writer.close()
-            except Exception:
-                pass
-
-
-# ----------------------
-# Helpers to create missions via API (optional, robust)
-# ----------------------
-def _http_ok(code: int) -> bool:
-    return code in (200, 201, 202, 204)
-
-
-def _try_post_create(api: str, payload: Dict[str, Any], timeout: float = 5.0) -> Tuple[bool, Optional[int], Optional[str]]:
-    if requests is None:
-        return False, None, "requests-not-available"
-    try:
-        r = requests.post(f"{api}/api/missions", json=payload, timeout=timeout)
-        return _http_ok(r.status_code), r.status_code, r.text
-    except Exception as e:
-        return False, None, str(e)
-
-
-def _try_put_create(api: str, mission_id: str, payload: Dict[str, Any], timeout: float = 5.0) -> Tuple[bool, Optional[int], Optional[str]]:
-    if requests is None:
-        return False, None, "requests-not-available"
-    try:
-        r = requests.put(f"{api}/api/missions/{mission_id}", json=payload, timeout=timeout)
-        return _http_ok(r.status_code), r.status_code, r.text
-    except Exception as e:
-        return False, None, str(e)
-
-
-def _try_assign(api: str, mission_id: str, rover_id: str, timeout: float = 5.0) -> Tuple[bool, Optional[int], Optional[str]]:
-    if requests is None:
-        return False, None, "requests-not-available"
-    api = api.rstrip("/")
-    try:
-        r = requests.post(f"{api}/api/missions/{mission_id}/assign", json={"rover_id": rover_id}, timeout=timeout)
-        if _http_ok(r.status_code):
-            return True, r.status_code, r.text
-    except Exception:
-        pass
-    try:
-        r2 = requests.patch(f"{api}/api/missions/{mission_id}", json={"assigned_rover": rover_id, "state": "ASSIGNED"}, timeout=timeout)
-        if _http_ok(r2.status_code):
-            return True, r2.status_code, r2.text
-        return False, r2.status_code, r2.text
-    except Exception as e:
-        return False, None, str(e)
-
-
-def create_missions_via_api(api_base: str, count: int, base_id: str = "M-AUTO", task: Optional[str] = None, params: Optional[Dict[str, Any]] = None, priority: int = 1, assign_to: Optional[str] = None) -> List[str]:
-    created = []
-    if requests is None:
-        logger.error("requests library not available; cannot create missions via API")
-        return created
-
-    api = api_base.rstrip("/")
-    for i in range(count):
-        mid = f"{base_id}-{int(time.time())%100000}-{i}"
-        t = task or DEFAULT_TASKS[i % len(DEFAULT_TASKS)]
-        payload = {"mission_id": mid, "task": t, "params": params or {}, "priority": priority}
-        ok, status, text = _try_post_create(api, payload)
-        if ok:
-            logger.info("Created mission %s via POST -> %s", mid, status)
-            created.append(mid)
-        else:
-            logger.warning("POST create %s failed (status=%s text=%s), trying PUT fallback", mid, status, text)
-            ok2, status2, text2 = _try_put_create(api, mid, payload)
-            if ok2:
-                logger.info("Created mission %s via PUT -> %s", mid, status2)
-                created.append(mid)
-            else:
-                logger.error("Failed to create mission %s (POST status=%s text=%s; PUT status=%s text=%s)", mid, status, text, status2, text2)
-                continue
-
-        time.sleep(0.05)
-        if assign_to:
-            assigned, st, tx = _try_assign(api, mid, assign_to)
-            if assigned:
-                logger.info("Assigned mission %s -> %s (status=%s)", mid, assign_to, st)
-            else:
-                logger.warning("Assign failed for %s -> %s (status=%s text=%s)", mid, assign_to, st, tx)
-
-    return created
-
-
+        if self._task_retransmit and not self._task_retransmit.done():
+            self._task_retransmit.cancel()
+            
+            
 # ----------------------
 # Entrypoint
 # ----------------------
-async def main(
+async def run_agent_main(
     rover_id: str,
     server_host: str,
     server_port: int,
-    interval: float,
-    exit_on_complete: bool,
     request_interval: float,
-    create_missions: int,
-    assign_created: bool,
-    api_base: str,
-    telemetry_enabled: bool,
-    telemetry_host: str,
-    telemetry_port: int,
 ):
     loop = asyncio.get_running_loop()
 
-    if create_missions and create_missions > 0:
-        logger.info("Creating %s missions via API %s (assign_created=%s)", create_missions, api_base, assign_created)
-        created = create_missions_via_api(api_base, create_missions, base_id="M-AUTO", assign_to=(rover_id if assign_created else None))
-        logger.info("Created missions: %s", created)
-
+    # Cria o socket UDP e liga-o a uma porta local (para que o servidor saiba para onde responder)
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -404,16 +359,14 @@ async def main(
     agent = RoverAgent(
         rover_id,
         (server_host, server_port),
-        interval=interval,
-        exit_on_complete=exit_on_complete,
         request_interval=request_interval,
-        telemetry_enabled=telemetry_enabled,
-        telemetry_addr=(telemetry_host, telemetry_port),
     )
 
     transport, protocol = await loop.create_datagram_endpoint(lambda: agent, sock=sock)
-    logger.info("RoverAgent started (rover=%s server=%s:%d interval=%s request_interval=%s telemetry=%s)", rover_id, server_host, server_port, interval, request_interval, telemetry_enabled)
+    logger.info("RoverAgent started (rover=%s server=%s:%d request_interval=%.1fs)", 
+                rover_id, server_host, server_port, request_interval)
 
+    # Mantém o loop a correr até ser cancelado
     stop = asyncio.Event()
     try:
         await stop.wait()
@@ -423,39 +376,31 @@ async def main(
         transport.close()
 
 
-if __name__ == "__main__":
+def main():
     p = argparse.ArgumentParser()
     p.add_argument("--rover-id", required=True)
     p.add_argument("--server", default="127.0.0.1")
     p.add_argument("--port", type=int, default=config.ML_UDP_PORT)
-    p.add_argument("--interval", type=float, default=1.0)
     p.add_argument("--request-interval", type=float, default=5.0)
-    p.add_argument("--exit-on-complete", action="store_true")
-    p.add_argument("--create-missions", type=int, default=0, help="If >0, create this many missions via Core API before polling")
-    p.add_argument("--assign-created", action="store_true", help="Assign created missions immediately to this rover (useful for tests)")
-    p.add_argument("--api", dest="api_base", default="http://127.0.0.1:65000", help="Core API base URL")
-    p.add_argument("--telemetry", dest="telemetry_enabled", action="store_true", help="Also send telemetry JSON to TelemetryServer TCP (NOT enabled by default in repro)")
-    p.add_argument("--telemetry-host", default="127.0.0.1")
-    p.add_argument("--telemetry-port", type=int, default=config.TELEMETRY_PORT)
     args = p.parse_args()
 
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s [%(name)s] %(message)s")
     try:
         asyncio.run(
-            main(
+            run_agent_main(
                 args.rover_id,
                 args.server,
                 args.port,
-                args.interval,
-                args.exit_on_complete,
                 args.request_interval,
-                args.create_missions,
-                args.assign_created,
-                args.api_base,
-                args.telemetry_enabled,
-                args.telemetry_host,
-                args.telemetry_port,
             )
         )
     except KeyboardInterrupt:
-        pass
+        logger.info("Agent shutting down via KeyboardInterrupt")
+    except Exception:
+        logger.exception("Unexpected error in agent main loop")
+
+
+if __name__ == "__main__":
+    # Garante que o logging está configurado
+    from common import config
+    config.configure_logging()
+    main()

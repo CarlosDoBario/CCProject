@@ -40,11 +40,12 @@ async def send_once(host: str, port: int, rover_id: str, telemetry: dict, ack_re
             tlvs.append(binary_proto.tlv_position(pos.get("x", 0.0), pos.get("y", 0.0), pos.get("z", 0.0)))
         if "battery_level_pct" in telemetry:
             tlvs.append(binary_proto.tlv_battery_level(int(telemetry.get("battery_level_pct", 0))))
-        if "progress_pct" in telemetry:
-            tlvs.append(binary_proto.tlv_progress(float(telemetry.get("progress_pct", 0.0))))
+        # Removida a conversão para TLV_PROGRESS pois progress_pct já não faz parte do output canónico do RoverSim
+        # if "progress_pct" in telemetry:
+        #     tlvs.append(binary_proto.tlv_progress(float(telemetry.get("progress_pct", 0.0))))
         if "status" in telemetry:
             tlvs.append(binary_proto.tlv_status_code(telemetry.get("status", "UNKNOWN")))
-        # include full payload as JSON fallback
+        # include full payload as JSON fallback (inclui temperatura, velocidade, e outros campos não TLV)
         tlvs.append((binary_proto.TLV_PAYLOAD_JSON, json.dumps(telemetry, ensure_ascii=False).encode("utf-8")))
 
         flags = binary_proto.FLAG_ACK_REQUESTED if ack_requested else 0
@@ -311,10 +312,12 @@ class TelemetryClient:
             tlvs.append(binary_proto.tlv_position(pos.get("x", 0.0), pos.get("y", 0.0), pos.get("z", 0.0)))
         if "battery_level_pct" in telemetry:
             tlvs.append(binary_proto.tlv_battery_level(int(telemetry.get("battery_level_pct", 0))))
-        if "progress_pct" in telemetry:
-            tlvs.append(binary_proto.tlv_progress(float(telemetry.get("progress_pct", 0.0))))
+        # Removida a conversão para TLV_PROGRESS pois progress_pct já não faz parte do output canónico do RoverSim
+        # if "progress_pct" in telemetry:
+        #     tlvs.append(binary_proto.tlv_progress(float(telemetry.get("progress_pct", 0.0))))
         if "status" in telemetry:
             tlvs.append(binary_proto.tlv_status_code(telemetry.get("status", "UNKNOWN")))
+        # O TLV_PAYLOAD_JSON incluirá todos os campos (posição, bateria, temperatura, velocidade, etc.)
         tlvs.append((binary_proto.TLV_PAYLOAD_JSON, json.dumps(telemetry, ensure_ascii=False).encode("utf-8")))
 
         flags = binary_proto.FLAG_ACK_REQUESTED if ack_requested else 0

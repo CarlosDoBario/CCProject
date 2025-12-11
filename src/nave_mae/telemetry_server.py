@@ -35,7 +35,7 @@ class TelemetryServer:
         self.host = host
         self.port = port
         self._server: Optional[asyncio.base_events.Server] = None
-        self._loop = asyncio.get_event_loop()
+        # self._loop = asyncio.get_event_loop() # REMOVIDO: Causa o RuntimeError
         self.mission_store = mission_store
         self.telemetry_store = telemetry_store
 
@@ -274,6 +274,26 @@ class TelemetryServer:
                         canonical["_msgid"] = header.get("msgid")
                         canonical["_ts_server_received_ms"] = binary_proto.now_ms()
 
+                        # NOVO CÓDIGO: Log da Telemetria para o terminal da Nave-Mãe (requisito do utilizador)
+                        # Campos necessários: ID do Rover, Posição (x, y, z), Estado Operacional, Bateria (%), Velocidade (m/s), Temperatura interna
+                        rover_id_log = rid or "UNKNOWN"
+                        pos = canonical.get("position", {"x": 0.0, "y": 0.0, "z": 0.0})
+                        status = canonical.get("status", "N/A")
+                        battery = canonical.get("battery_level_pct", 0.0)
+                        # Os novos campos (velocidade e temperatura) são extraídos do 'canonical' (proveniente do TLV_PAYLOAD_JSON)
+                        speed = canonical.get("current_speed_m_s", 0.0) 
+                        temp = canonical.get("internal_temp_c", 0.0)
+
+                        log_line = (
+                            f"TELEMETRIA RECEBIDA - Rover ID: {rover_id_log} | "
+                            f"Posição: ({pos['x']:.2f}, {pos['y']:.2f}, {pos['z']:.2f}) | "
+                            f"Estado: {status.upper()} | "
+                            f"Bateria: {battery:.1f}% | "
+                            f"Velocidade: {speed:.1f} m/s | "
+                            f"Temperatura: {temp:.1f} °C"
+                        )
+                        print(log_line) # Saída direta para o terminal da Nave-Mãe.
+                        # FIM DO NOVO CÓDIGO
 
                         errors = canonical.get("errors") or []
                         if any(err.get("code") == "BAT-EMERGENCY-ABORT" for err in errors):
@@ -374,3 +394,56 @@ class TelemetryServer:
 
     def get_connected_rovers(self) -> list:
         return list(self._clients.keys())
+        
+# -------------------------------------------------------------------
+# NOVO CÓDIGO DE EXECUÇÃO (main) CORRIGIDO
+# -------------------------------------------------------------------
+
+async def _run_server_main(server: TelemetryServer):
+    """
+    Função assíncrona que inicia e mantém o servidor a correr.
+    """
+    await server.start()
+    # Mantém o servidor a correr até ser cancelado (e.g. por KeyboardInterrupt)
+    try:
+        while True:
+            await asyncio.sleep(3600)
+    except asyncio.CancelledError:
+        pass
+    finally:
+        # Garante a paragem em caso de cancelamento
+        if server._server:
+             await server.stop()
+
+
+def main():
+    """Entry point for the Telemetry Server."""
+    server = None
+    try:
+        from common import config
+        config.configure_logging()
+        port = config.TELEMETRY_PORT
+        host = config.TELEMETRY_HOST
+        
+        # Para que o servidor aceite ligações do exterior (como acontece no CORE) ou do 127.0.0.1 (local)
+        # O host é definido como 0.0.0.0 se não for explicitamente definido para ser mais restritivo.
+        server = TelemetryServer(host="0.0.0.0", port=port)
+
+        # Usa asyncio.run para configurar e executar o loop do evento.
+        asyncio.run(_run_server_main(server))
+
+    except KeyboardInterrupt:
+        logger.info("TelemetryServer exiting (via KeyboardInterrupt)")
+    except Exception:
+        logger.exception("Unexpected error in TelemetryServer main loop")
+
+
+if __name__ == "__main__":
+    # Garantir que o logging está configurado antes de main()
+    try:
+        from common import config
+        config.configure_logging()
+    except Exception:
+        logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s [%(name)s] %(message)s")
+        
+    main()

@@ -75,7 +75,8 @@ class MissionStore:
 
     def __init__(self, persist_file: Optional[str] = None):
         # allow env var override if not provided
-        self.persist_file = persist_file or os.getenv("ML_MISSION_STORE_FILE")
+        from common import config
+        self.persist_file = persist_file or config.MISSION_STORE_FILE
         self._lock = Lock()
         self._missions: Dict[str, Dict[str, Any]] = {}
         self._rovers: Dict[str, Dict[str, Any]] = {}
@@ -368,22 +369,6 @@ class MissionStore:
     def update_from_telemetry(self, rover_id: str, telemetry: Dict[str, Any]) -> None:
         """
         Integrate canonical telemetry payloads into MissionStore.
-
-        Expected telemetry keys (canonical):
-          - mission_id (optional)
-          - progress_pct (optional)
-          - status (optional)  # string
-          - position, battery_level_pct, etc (optional)
-          - _msgid (optional)
-          - _ts_server_received_ms (optional)  # epoch ms set by server
-          - addr or _addr (optional)  # (ip,port) or {"ip":..,"port":..}
-
-        Behaviour:
-          - update rover last_seen/address/state
-          - if telemetry contains mission_id + progress_pct -> call update_progress
-          - if progress >= 100 or status indicates completion -> call complete_mission
-          - emit "telemetry" event via hooks
-          - persist if configured
         """
         try:
             with self._lock:
@@ -470,13 +455,19 @@ class MissionStore:
         self.save_to_file(path)
 
     def create_demo_missions(self) -> None:
+        """
+        Cria missões de demonstração com duração e intervalo de atualização definidos
+        para que o RoverSim tenha tempo de progredir.
+        """
+        # CORREÇÃO: Adicionar max_duration_s e update_interval_s
         demos = [
-            {"task": "capture_images", "area": {"x1": 10, "y1": 10, "z1": 0, "x2": 20, "y2": 20, "z2": 0}, "params": {"interval_s": 5, "frames": 60}, "priority": 1},
-            {"task": "collect_samples", "area": {"x1": 30, "y1": 5, "z1": 0, "x2": 35, "y2": 10, "z2": 0}, "params": {"depth_mm": 50, "sample_count": 2}, "priority": 2},
-            {"task": "env_analysis", "area": {"x1": 0, "y1": 0, "z1": 0, "x2": 50, "y2": 50, "z2": 5}, "params": {"sensors": ["temp", "pressure"], "sampling_rate_s": 10}, "priority": 3},
+            {"task": "capture_images", "area": {"x1": 10, "y1": 10, "z1": 0, "x2": 20, "y2": 20, "z2": 0}, "params": {"interval_s": 5, "frames": 60}, "priority": 1, "max_duration_s": 20.0, "update_interval_s": 1.0},
+            {"task": "collect_samples", "area": {"x1": 30, "y1": 5, "z1": 0, "x2": 35, "y2": 10, "z2": 0}, "params": {"depth_mm": 50, "sample_count": 2}, "priority": 2, "max_duration_s": 15.0, "update_interval_s": 1.0},
+            {"task": "env_analysis", "area": {"x1": 0, "y1": 0, "z1": 0, "x2": 50, "y2": 50, "z2": 5}, "params": {"sensors": ["temp", "pressure"], "sampling_rate_s": 10}, "priority": 3, "max_duration_s": 20.0, "update_interval_s": 1.0},
         ]
         for m in demos:
             try:
-                self.create_mission(m)
+                # O método create_mission suporta os campos adicionais diretamente
+                self.create_mission(m) 
             except Exception:
                 logger.exception("create_demo_missions: failed to create demo mission")

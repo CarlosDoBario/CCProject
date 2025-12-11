@@ -1,15 +1,7 @@
 #!/usr/bin/env python3
 """
 ml_server.py (binary ML/UDP version)
-
-This module implements a DatagramProtocol-based ML server with:
-- TLV/binary parsing via common.binary_proto
-- reliable send with pending_outgoing & retransmit/backoff
-- ACK handling and deduplication
-- helpers for sending mission_cancel and handling its ACK
-
-Added: async stop() and stop_sync() methods to allow graceful shutdown/cleanup
-of running retransmit/cleanup tasks and to close the transport cleanly.
+...
 """
 from __future__ import annotations
 
@@ -19,6 +11,7 @@ import logging
 import struct
 import threading
 import json
+import socket
 from typing import Dict, Any, Optional, Tuple
 
 from common import binary_proto, config, utils
@@ -31,6 +24,7 @@ try:
 except Exception:
     logger.warning("nave_mae.mission_store not available; using lightweight fallback")
 
+    # Fallback leve
     class MissionStore:
         def __init__(self, persist_file: Optional[str] = None):
             self.missions = {}
@@ -71,6 +65,17 @@ except Exception:
 
         def get_mission(self, mission_id):
             return self.missions.get(mission_id)
+        
+        def create_demo_missions(self):
+            demos = [
+                {"task": "capture_images", "mission_id": "M-DEMO-IMG", "area": {"x1": 10, "y1": 10, "z1": 0, "x2": 20, "y2": 20, "z2": 0}, "params": {"interval_s": 5, "frames": 60, "max_duration_s": 20.0, "update_interval_s": 1.0}, "priority": 1},
+                {"task": "collect_samples", "mission_id": "M-DEMO-SAM", "area": {"x1": 30, "y1": 5, "z1": 0, "x2": 35, "y2": 10, "z2": 0}, "params": {"depth_mm": 50, "sample_count": 2, "max_duration_s": 15.0, "update_interval_s": 1.0}, "priority": 2},
+                {"task": "env_analysis", "mission_id": "M-DEMO-ENV", "area": {"x1": 0, "y1": 0, "z1": 0, "x2": 50, "y2": 50, "z2": 5}, "params": {"sensors": ["temp", "pressure"], "sampling_rate_s": 10, "max_duration_s": 20.0, "update_interval_s": 1.0}, "priority": 3},
+            ]
+            for m in demos:
+                if m["mission_id"] not in self.missions:
+                     self.missions[m["mission_id"]] = m
+                     self.missions[m["mission_id"]]["state"] = "CREATED"
 
 
 class PendingOutgoing:
@@ -114,6 +119,7 @@ class MLServerProtocol(asyncio.DatagramProtocol):
         self.transport = transport
         sockname = transport.get_extra_info("sockname")
         logger.info("ML server listening on %s", sockname)
+        # É seguro chamar get_event_loop() aqui
         loop = asyncio.get_event_loop()
         self._loop = loop
         # schedule background maintenance tasks on this loop
@@ -167,6 +173,7 @@ class MLServerProtocol(asyncio.DatagramProtocol):
                 try:
                     # mission_store.register_rover might accept address dict or tuple
                     self.mission_store.register_rover(rover_id, address={"ip": addr[0], "port": int(addr[1])})
+                    logger.info("Rover %s registered with address %s", rover_id, addr)
                 except TypeError:
                     try:
                         self.mission_store.register_rover(rover_id, addr)
@@ -244,14 +251,33 @@ class MLServerProtocol(asyncio.DatagramProtocol):
 
     # ----- handlers and helpers -------------------------------------------------
     def _handle_request_mission(self, rover_id: str, canonical: Dict[str, Any], addr: Tuple[str, int], msgid: int = 0):
-        logger.info("Handling REQUEST_MISSION from %s (%s)", rover_id, addr)
+        logger.info("Handling REQUEST_MISSION from %s (%s) [MsgID: %s]", rover_id, addr, msgid)
+        
+        # Primeiro, envia ACK para o REQUEST_MISSION recebido (para parar a retransmissão do cliente)
+        try:
+             ack_pkt_req = binary_proto.pack_ml_datagram(
+                    binary_proto.ML_ACK,
+                    rover_id,
+                    [(binary_proto.TLV_ACKED_MSG_ID, struct.pack(">Q", msgid))],
+                    msgid=0,
+                )
+             if self.transport:
+                self.transport.sendto(ack_pkt_req, addr)
+                self.last_acks[msgid] = ack_pkt_req
+                logger.debug("Sent ACK for REQUEST_MISSION msgid=%s", msgid)
+        except Exception:
+            logger.exception("Failed to send ACK for REQUEST_MISSION")
+
+
         pending = self.mission_store.get_pending_mission_for_rover(rover_id)
         if pending is None:
             err_tlv = (binary_proto.TLV_ERRORS, b"No mission available")
             err_pkt = binary_proto.pack_ml_datagram(binary_proto.ML_ERROR, rover_id, [err_tlv])
             if self.transport:
                 self.transport.sendto(err_pkt, addr)
+            logger.warning("No mission available for %s", rover_id)
             return
+        
         try:
             self.mission_store.assign_mission_to_rover(pending, rover_id)
         except Exception:
@@ -259,25 +285,75 @@ class MLServerProtocol(asyncio.DatagramProtocol):
 
         # build assign TLVs
         tlvs = []
+        # Adiciona TLV_MISSION_ID e TLV_TASK
         tlvs.append((binary_proto.TLV_MISSION_ID, pending["mission_id"].encode("utf-8")))
+        tlvs.append(binary_proto.tlv_string(binary_proto.TLV_TASK, pending["task"]))
+        
+        # Adiciona AREA se existir
+        if pending.get("area"):
+            area = pending["area"]
+            vals = (float(area["x1"]), float(area["y1"]), float(area["z1"]), float(area["x2"]), float(area["y2"]), float(area["z2"]))
+            area_bytes = struct.pack(">ffffff", *vals)
+            tlvs.append((binary_proto.TLV_AREA, area_bytes))
+        
+        # Adiciona PARAMS_JSON
         params = pending.get("params", {})
         tlvs.append((binary_proto.TLV_PARAMS_JSON, json.dumps(params).encode("utf-8")))
 
         # numeric msgid for server->client message (uint64)
         server_msgid = int(time.time() * 1000) & 0xFFFFFFFFFFFFFFFF
-        assign_pkt = binary_proto.pack_ml_datagram(binary_proto.ML_MISSION_ASSIGN, rover_id, tlvs, msgid=server_msgid)
+        # MISSION_ASSIGN deve pedir ACK para garantir que o rover recebeu a missão
+        assign_pkt = binary_proto.pack_ml_datagram(binary_proto.ML_MISSION_ASSIGN, rover_id, tlvs, msgid=server_msgid, flags=binary_proto.FLAG_ACK_REQUESTED)
 
         # store pending for retransmit & track
         self._send_with_reliability(assign_pkt, addr, message_type="MISSION_ASSIGN", mission_id=pending["mission_id"], msgid=server_msgid)
+        logger.info("Sent MISSION_ASSIGN [MsgID: %s] to %s@%s", server_msgid, rover_id, addr)
+
 
     def _handle_progress(self, rover_id: str, canonical: Dict[str, Any], addr: Tuple[str, int]):
         mission_id = canonical.get("mission_id")
-        logger.info("Progress from %s on mission %s: %s", rover_id, mission_id, canonical.get("progress_pct"))
+        
+        # Log da informação detalhada recebida (inclui temperatura/velocidade do TLV_PARAMS_JSON)
+        progress_pct = canonical.get("progress_pct", 0.0)
+        status = canonical.get("status", "N/A")
+        temp = canonical.get("internal_temp_c", 0.0)
+        speed = canonical.get("current_speed_m_s", 0.0)
+        battery = canonical.get("battery_level_pct", 0.0)
+        position = canonical.get("position", {"x": 0.0, "y": 0.0, "z": 0.0})
+        
+        logger.info(f"Progress from {rover_id} on mission {mission_id}: {progress_pct:.1f}%% (Status: {status}, Temp: {temp:.1f}°C, Speed: {speed:.1f}m/s)")
+
         try:
             if mission_id:
                 self.mission_store.update_progress(mission_id, rover_id, canonical)
+            
+            # --- CORREÇÃO CRÍTICA: Atualiza o estado detalhado do Rover no MissionStore ---
+            # O MissionStore deve ser a fonte de verdade para a API.
+            with self.mission_store._lock:
+                r = self.mission_store._rovers.setdefault(rover_id, {"rover_id": rover_id})
+                
+                # Atualiza os campos simples no nível superior para fácil acesso
+                r["battery_level_pct"] = battery
+                r["internal_temp_c"] = temp
+                r["current_speed_m_s"] = speed
+                r["position"] = position
+                r["state"] = status # O status da telemetria é mais detalhado que o estado da missão
+                
+                # Armazena o payload completo sob uma chave para o API_Server ler
+                r["last_telemetry_full"] = {
+                    "status": status,
+                    "battery_level_pct": battery,
+                    "internal_temp_c": temp,
+                    "current_speed_m_s": speed,
+                    "position": position,
+                    "timestamp_ms": canonical.get("timestamp_ms", utils.now_ms()),
+                }
+                
+                # Salvar para garantir que o MissionStore do disco está atualizado
+                self.mission_store.save_to_file()
+
         except Exception:
-            logger.exception("mission_store.update_progress failed")
+            logger.exception("mission_store update failed in ML Server")
 
     def _handle_complete(self, rover_id: str, canonical: Dict[str, Any], addr: Tuple[str, int]):
         mission_id = canonical.get("mission_id")
@@ -321,6 +397,7 @@ class MLServerProtocol(asyncio.DatagramProtocol):
             addr = None
 
         if addr is None:
+            # Assumir a porta do ML do config para o host padrão (é um chute, mas necessário)
             addr = (config.ML_HOST, config.ML_UDP_PORT)
 
         # store pending and send
@@ -355,10 +432,9 @@ class MLServerProtocol(asyncio.DatagramProtocol):
         with self._lock:
             self.pending_outgoing[int(msgid)] = po
         try:
-            if self.transport:
-                self.transport.sendto(packet, addr)
-                logger.debug("Sent %s msgid=%s to %s", message_type, msgid, addr)
-                self.metrics.incr("messages_sent")
+            self.transport.sendto(packet, addr)
+            logger.debug("Sent %s msgid=%s to %s", message_type, msgid, addr)
+            self.metrics.incr("messages_sent")
         except Exception:
             logger.exception("Failed to send packet to %s", addr)
 
@@ -408,7 +484,7 @@ class MLServerProtocol(asyncio.DatagramProtocol):
                             except Exception:
                                 logger.exception("Failed retransmit for %s", msg_id)
                         else:
-                            logger.error("Retries exhausted for msg %s to %s (type=%s)", msg_id, po.addr, po.message_type)
+                            logger.error("Retries exhausted for pending msg %s", msg_id)
                             try:
                                 if po.message_type == "MISSION_ASSIGN" and po.mission_id:
                                     if hasattr(self.mission_store, "unassign_mission"):
@@ -531,5 +607,67 @@ class MLServerProtocol(asyncio.DatagramProtocol):
             except Exception:
                 pass
 
+# -------------------------------------------------------------------
+# NOVO CÓDIGO DE EXECUÇÃO (main)
+# -------------------------------------------------------------------
 
-# End of file
+async def _run_ml_server_main(server_protocol: MLServerProtocol, store: MissionStore):
+    """
+    Função assíncrona que inicia e mantém o servidor ML a correr.
+    """
+    loop = asyncio.get_running_loop()
+    
+    # 1. Cria missões demo para garantir que há algo para atribuir
+    store.create_demo_missions()
+    logger.info("Created demo missions in MissionStore.")
+
+    # 2. Inicia o servidor UDP
+    # O create_datagram_endpoint irá chamar connection_made no server_protocol
+    transport, protocol = await loop.create_datagram_endpoint(
+        lambda: server_protocol,
+        local_addr=('0.0.0.0', config.ML_UDP_PORT),
+        family=socket.AF_INET
+    )
+    
+    # Mantém o servidor a correr até ser cancelado (e.g. por KeyboardInterrupt)
+    try:
+        while True:
+            await asyncio.sleep(3600)
+    except asyncio.CancelledError:
+        pass
+    finally:
+        # Garante a paragem em caso de cancelamento
+        await server_protocol.stop()
+
+
+def main():
+    """Entry point for the MissionLink Server."""
+    try:
+        from common import config
+        # Garantir que o logging está configurado (já feito pelo if __name__ == "__main__")
+
+        # 1. Inicializa o MissionStore (que carrega/cria missões)
+        store = MissionStore(persist_file=config.MISSION_STORE_FILE)
+        
+        # 2. Inicializa o Protocolo ML
+        protocol = MLServerProtocol(mission_store=store)
+        
+        # 3. Executa o loop assíncrono
+        asyncio.run(_run_ml_server_main(protocol, store))
+
+    except KeyboardInterrupt:
+        logger.info("MLServer exiting (via KeyboardInterrupt)")
+    except Exception:
+        logger.exception("Unexpected error in MLServer main loop")
+
+
+if __name__ == "__main__":
+    # Garantir que o logging está configurado
+    import logging
+    try:
+        from common import config
+        config.configure_logging()
+    except Exception:
+        logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s [%(name)s] %(message)s")
+        
+    main()

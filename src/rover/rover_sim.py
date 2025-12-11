@@ -48,6 +48,7 @@ class RoverSim:
         self.samples_collected: int = 0
         self.battery_level_pct: float = 100.0
         self.internal_temp_c: float = self.INITIAL_TEMP
+        self.current_speed_m_s: float = 0.0 # NOVO CAMPO: Velocidade atual (m/s)
         self.errors: list = []   # list of error dicts, empty when none
         self._elapsed_on_mission: float = 0.0
         self._mission_total_time: float = 10.0  # seconds, default short duration for tests
@@ -119,6 +120,7 @@ class RoverSim:
         # Lógica de Arrefecimento (COOLING)
         # ----------------------------------------------------
         if self.state == "COOLING":
+            self.current_speed_m_s = 0.0 # Parado
             # Arrefecimento rápido
             self.internal_temp_c = max(self.COOL_DOWN_TEMP, self.internal_temp_c - (self.COOL_RATE_PER_S * elapsed_s))
             if self.internal_temp_c <= self.COOL_DOWN_TEMP:
@@ -134,6 +136,7 @@ class RoverSim:
         # Lógica de Carregamento (CHARGING)
         # ----------------------------------------------------
         if self.state == "CHARGING":
+            self.current_speed_m_s = 0.0 # Parado
             self.battery_level_pct = min(100.0, self.battery_level_pct + (self.CHARGE_RATE_PER_S * elapsed_s))
             if self.battery_level_pct >= 100.0:
                 self.battery_level_pct = 100.0
@@ -146,6 +149,7 @@ class RoverSim:
         # Lógica de Viagem para Carregamento (CHARGING_TRAVEL)
         # ----------------------------------------------------
         if self.state == "CHARGING_TRAVEL":
+            self.current_speed_m_s = self.TRAVEL_SPEED # Em movimento
             self._elapsed_travel_time += elapsed_s
             
             target = self.charging_station_position
@@ -170,6 +174,7 @@ class RoverSim:
                 self.position = dict(target) 
                 self.state = "CHARGING"
                 self._elapsed_travel_time = 0.0
+                self.current_speed_m_s = 0.0 # Acabou de chegar e vai carregar
                 return
             
             return 
@@ -178,6 +183,7 @@ class RoverSim:
         # Verificação Pré/Pós-Missão (Bateria < 10% em IDLE ou COMPLETED)
         # ----------------------------------------------------
         if self.state in ("IDLE", "COMPLETED"):
+            self.current_speed_m_s = 0.0 # Parado
             # Arrefecimento passivo quando IDLE e acima da temperatura ambiente
             if self.internal_temp_c > self.INITIAL_TEMP:
                 self.internal_temp_c = max(self.INITIAL_TEMP, self.internal_temp_c - (self.COOL_RATE_PER_S * 0.1 * elapsed_s))
@@ -195,11 +201,13 @@ class RoverSim:
 
         # Sai se não estiver em RUNNING
         if self.state != "RUNNING" or not self.current_mission:
+            self.current_speed_m_s = 0.0 # Parado ou estado não monitorizado
             return
 
         # ----------------------------------------------------
         # Lógica de Missão em Execução (RUNNING)
         # ----------------------------------------------------
+        self.current_speed_m_s = self.TRAVEL_SPEED * 0.8 # Simulação de movimento em missão a 80% da velocidade máxima
         
         # 1. Aumento de temperatura
         self.internal_temp_c = min(self.MAX_TEMP + self.COOL_RATE_PER_S, self.internal_temp_c + (self.HEAT_RATE_PER_S * elapsed_s))
@@ -209,6 +217,7 @@ class RoverSim:
             self.state = "COOLING" # Pausa a missão
             err = {"code": "TEMP-OVERHEAT", "description": f"Internal temp exceeded {self.MAX_TEMP:.1f}C. Mission paused for cooling."}
             self.errors.append(err)
+            self.current_speed_m_s = 0.0 # Parou
             return # Aborta o resto do step de RUNNING (a missão está em pausa)
         
         # 3. Avanço normal da missão (se não estiver em COOLING)
@@ -237,6 +246,7 @@ class RoverSim:
              self._elapsed_on_mission = 0.0
              self.current_mission = {"mission_id": f"EMERG-CHARGE-{time.time()}", "task": "travel_to_charge", "params": {"target_pos": self.charging_station_position}}
              self._elapsed_travel_time = 0.0
+             self.current_speed_m_s = self.TRAVEL_SPEED # Começa a viajar para carregar
              return
 
         # samples collected heuristic
@@ -257,12 +267,14 @@ class RoverSim:
             err = {"code": "SIM-RAND-ERR", "description": "Transient simulated sensor glitch"}
             self.errors.append(err)
             self.state = "ERROR"
+            self.current_speed_m_s = 0.0
             return
 
         # Completion check
         if self._elapsed_on_mission >= self._mission_total_time or self.progress_pct >= 100.0:
             self.progress_pct = 100.0
             self.state = "COMPLETED"
+            self.current_speed_m_s = 0.0
             # Ensure samples_collected final values
             if task == "collect_samples":
                 self.samples_collected = int(params.get("sample_count", 1))
@@ -279,7 +291,9 @@ class RoverSim:
         Return a telemetry dict used by ml_client to build PROGRESS/MISSION_COMPLETE bodies.
 
         The dict matches the canonical fields expected by the binary TLV packers / MissionStore:
-          - mission_id, progress_pct, position, battery_level_pct, status, errors, samples_collected, timestamp_ms
+          - mission_id, progress_pct, position, battery_level_pct, status, errors, samples_collected, timestamp_ms).
+        
+        NOTE: progress_pct is removed from the canonical output as requested, and internal_temp_c / current_speed_m_s are added.
         """
         ts_ms = int(time.time() * 1000)
 
@@ -294,10 +308,11 @@ class RoverSim:
         
         return {
             "mission_id": (self.current_mission.get("mission_id") if self.current_mission else None),
-            "progress_pct": self.progress_pct,
+            # "progress_pct": self.progress_pct, # Removido conforme solicitado
             "position": dict(self.position),
             "battery_level_pct": round(self.battery_level_pct, 1),
             "internal_temp_c": round(self.internal_temp_c, 1), # NOVO CAMPO
+            "current_speed_m_s": round(self.current_speed_m_s, 1), # NOVO CAMPO: Velocidade
             "status": status_report,
             "errors": list(self.errors),
             "samples_collected": int(self.samples_collected),

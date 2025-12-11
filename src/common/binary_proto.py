@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 binary_proto.py
 
@@ -155,7 +156,7 @@ def unpack_ts_header(buf: bytes) -> Dict[str, Any]:
 # ML header: version(1) | msgtype(1) | flags(1) | seqnum(4) | msgid(8) | timestamp_ms(8)
 ML_HEADER_FMT = ">BBB I Q Q"
 # note: space for readability in format not necessary; use same calc
-ML_HEADER_FMT = ">BBB I Q Q"
+ML_HEADER_FMT = ">BBBIQQ"
 # Calc size
 ML_HEADER_SIZE = 1 + 1 + 1 + 4 + 8 + 8  # 23
 
@@ -423,7 +424,6 @@ def tlv_to_canonical(tlv_map: Dict[int, List[bytes]]) -> Dict[str, Any]:
                     caps.extend([p.strip() for p in s.split(",") if p.strip()])
                 else:
                     caps.append(s.strip())
-        if caps:
             # dedupe while preserving order
             seen = set()
             caps_filtered = []
@@ -449,6 +449,12 @@ def tlv_to_canonical(tlv_map: Dict[int, List[bytes]]) -> Dict[str, Any]:
             parsed = _safe_json_load(tlv_map[TLV_PARAMS_JSON][0])
             if parsed is not None:
                 out["params"] = parsed
+                # CORREÇÃO: Mesclar campos para o nível superior do canonical (Temp/Speed/Status)
+                if isinstance(parsed, dict):
+                    for k, v in parsed.items():
+                        # Só adiciona se o campo ainda não tiver sido set por um TLV dedicado
+                        if k not in out: 
+                            out[k] = v 
             else:
                 out["params_json"] = tlv_map[TLV_PARAMS_JSON][0].decode("utf-8", errors="replace")
         except Exception:
