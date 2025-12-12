@@ -79,14 +79,14 @@ ML_PROTOCOL: str = _parse_str(os.environ.get("ML_PROTOCOL"), "ML/1.0")
 BINARY_PROTO_VERSION: int = _parse_int(os.environ.get("BINARY_PROTO_VERSION"), 1)
 
 # Networking defaults
-TELEMETRY_HOST: str = _parse_str(os.environ.get("TELEMETRY_HOST"), "127.0.0.1")
+TELEMETRY_HOST: str = _parse_str(os.environ.get("TELEMETRY_HOST"), "10.0.10.1")
 TELEMETRY_PORT: int = _parse_int(os.environ.get("TELEMETRY_PORT"), 65080)
 
 ML_HOST: str = _parse_str(os.environ.get("ML_HOST"), "0.0.0.0")
 ML_UDP_PORT: int = _parse_int(os.environ.get("ML_UDP_PORT"), 64070)
 
 # API de Observação / Ground Control
-API_HOST: str = _parse_str(os.environ.get("API_HOST"), "127.0.0.1")
+API_HOST: str = _parse_str(os.environ.get("API_HOST"), "192.168.0.1")
 API_PORT: int = _parse_int(os.environ.get("API_PORT"), 65000)
 
 # Datagram sizing (ML)

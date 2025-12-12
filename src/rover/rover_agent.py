@@ -463,7 +463,7 @@ async def run_agent_main(
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--rover-id", required=True)
-    p.add_argument("--server", default="127.0.0.1")
+    p.add_argument("--server", default="10.0.10.1")
     p.add_argument("--port", type=int, default=config.ML_UDP_PORT)
     p.add_argument("--request-interval", type=float, default=5.0)
     args = p.parse_args()

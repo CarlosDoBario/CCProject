@@ -196,7 +196,7 @@ if __name__ == "__main__":
         logging.basicConfig(level=logging.WARNING, format="%(asctime)s %(levelname)s [%(name)s] %(message)s")
 
     p = argparse.ArgumentParser(description="Ground Control Client (API Consumer)")
-    p.add_argument("--api", dest="api_base", default=f"http://127.0.0.1:{config.API_PORT}", help="Core API base URL")
+    p.add_argument("--api", dest="api_base", default=f"http://192.168.0.1:{config.API_PORT}", help="Core API base URL")
     p.add_argument("--interval", type=float, default=5.0, help="Polling interval in seconds")
     args = p.parse_args()
 
