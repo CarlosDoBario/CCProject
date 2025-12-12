@@ -34,7 +34,8 @@ except Exception:
         def register_rover(self, rover_id, address=None):
             self.rovers[rover_id] = {"rover_id": rover_id, "address": address, "state": "IDLE", "last_seen": utils.now_iso()}
 
-        def get_pending_mission_for_rover(self, rover_id):
+        def get_pending_mission_for_rover(self, rover_id, mission_id_hint=None): # ADICIONADO hint
+            # Lógica simples (não suporta hint)
             for m in self.missions.values():
                 if m.get("assigned_rover") is None:
                     return m
@@ -255,6 +256,11 @@ class MLServerProtocol(asyncio.DatagramProtocol):
     def _handle_request_mission(self, rover_id: str, canonical: Dict[str, Any], addr: Tuple[str, int], msgid: int = 0):
         logger.info("Handling REQUEST_MISSION from %s (%s) [MsgID: %s]", rover_id, addr, msgid)
         
+        # NOVO: Tenta extrair o mission_id para resumption/hint
+        mission_id_hint = canonical.get("mission_id")
+        if mission_id_hint:
+            logger.info(f"REQUEST_MISSION includes hint for mission: {mission_id_hint}")
+        
         # Primeiro, envia ACK para o REQUEST_MISSION recebido (para parar a retransmissão do cliente)
         try:
              ack_pkt_req = binary_proto.pack_ml_datagram(
@@ -271,7 +277,9 @@ class MLServerProtocol(asyncio.DatagramProtocol):
             logger.exception("Failed to send ACK for REQUEST_MISSION")
 
 
-        pending = self.mission_store.get_pending_mission_for_rover(rover_id)
+        # MODIFICADO: Passa mission_id_hint para get_pending_mission_for_rover
+        pending = self.mission_store.get_pending_mission_for_rover(rover_id, mission_id_hint)
+
         if pending is None:
             err_tlv = (binary_proto.TLV_ERRORS, b"No mission available")
             err_pkt = binary_proto.pack_ml_datagram(binary_proto.ML_ERROR, rover_id, [err_tlv])
@@ -280,10 +288,16 @@ class MLServerProtocol(asyncio.DatagramProtocol):
             logger.warning("No mission available for %s", rover_id)
             return
         
-        try:
-            self.mission_store.assign_mission_to_rover(pending, rover_id)
-        except Exception:
-            logger.exception("Failed to assign mission in mission_store")
+        # NOVO: Verifica se a missão já estava atribuída (caso de retoma)
+        is_already_assigned = pending.get("assigned_rover") == rover_id and pending["state"] in ("ASSIGNED", "IN_PROGRESS")
+
+        if not is_already_assigned:
+            try:
+                self.mission_store.assign_mission_to_rover(pending, rover_id)
+            except Exception:
+                logger.exception("Failed to assign mission in mission_store")
+        else:
+            logger.info(f"Mission {pending['mission_id']} already assigned to {rover_id}. Sending re-ASSIGN for resumption.")
 
         # build assign TLVs
         tlvs = []

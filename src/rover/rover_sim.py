@@ -193,8 +193,9 @@ class RoverSim:
         dy = self.position["y"] - self.current_target["y"]
         distance = math.sqrt(dx**2 + dy**2)
         
-        if distance > self.MOVE_THRESHOLD and not is_resumption:
-            # Se for nova missão e estiver longe, move-se.
+        # MODIFICADO: A condição 'and not is_resumption' foi removida.
+        if distance > self.MOVE_THRESHOLD:
+            # Se estiver longe (após ir carregar, por exemplo), move-se para o alvo da missão.
             self.state = "MOVING_TO_MISSION"
         elif self.progress_pct < 100.0:
             # Se for retomada ou nova missão já perto, e não estiver completa, corre.

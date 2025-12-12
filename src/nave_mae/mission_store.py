@@ -269,13 +269,41 @@ class MissionStore:
         with self._lock:
             return {mid: dict(m) for mid, m in self._missions.items()}
 
-    def get_pending_mission_for_rover(self, rover_id: str) -> Optional[Dict[str, Any]]:
+    def get_pending_mission_for_rover(self, rover_id: str, mission_id_hint: Optional[str] = None) -> Optional[Dict[str, Any]]: # MODIFICADO
+        """
+        Retorna a próxima missão para o rover. Prioriza a missão solicitada para retoma, 
+        se estiver atribuída ao rover e não estiver concluída/cancelada.
+        """
         with self._lock:
-            pending = [m for m in self._missions.values() if m["assigned_rover"] is None]
+            # 1. Trata a Dica de Retomada de Missão (Resumption Hint)
+            if mission_id_hint:
+                m_hint = self._missions.get(mission_id_hint)
+                if m_hint:
+                    # Se a missão estiver atribuída a este rover e não estiver concluída/cancelada, 
+                    # significa que foi interrompida e o rover está a pedir para a retomar. Priorizar!
+                    if m_hint["assigned_rover"] == rover_id and m_hint["state"] in ("ASSIGNED", "IN_PROGRESS"):
+                        logger.info(f"Prioritizing assigned mission {mission_id_hint} for resumption by {rover_id}.")
+                        return dict(m_hint)
+                    
+                    # Se a missão estiver em estado CREATED mas for solicitada explicitamente, atribuí-la.
+                    if m_hint["assigned_rover"] is None and m_hint["state"] == "CREATED":
+                         return dict(m_hint)
+                         
+                    # Caso contrário, se estiver atribuída a outro rover ou em estado final, cai no fallback.
+                    if m_hint["assigned_rover"] is not None and m_hint["assigned_rover"] != rover_id:
+                        logger.warning(f"Rover {rover_id} requested mission {mission_id_hint}, but it's assigned to {m_hint['assigned_rover']}. Falling back to priority list.")
+
+            # 2. Fallback para a lógica de prioridade (apenas missões CREATED / não atribuídas)
+            pending = [m for m in self._missions.values() if m["assigned_rover"] is None and m["state"] == "CREATED"]
             if not pending:
                 return None
+            
+            # Ordena por prioridade (menor número = maior prioridade)
             pending.sort(key=lambda x: (-int(x.get("priority", 1)), x.get("created_at")))
+            
+            logger.info(f"Falling back to next CREATED mission: {pending[0].get('mission_id')}")
             return dict(pending[0])
+
 
     def assign_mission_to_rover(self, mission: Dict[str, Any], rover_id: str) -> None:
         with self._lock:
@@ -283,8 +311,8 @@ class MissionStore:
             if mid not in self._missions:
                 raise KeyError("mission not found")
             m = self._missions[mid]
-            if m["assigned_rover"] is not None:
-                raise ValueError("mission already assigned")
+            if m["assigned_rover"] is not None and m["assigned_rover"] != rover_id:
+                raise ValueError(f"mission already assigned to {m['assigned_rover']}")
             m["assigned_rover"] = rover_id
             m["state"] = "ASSIGNED"
             m["assigned_at"] = utils.now_iso()
@@ -463,7 +491,7 @@ class MissionStore:
         demos = [
             {"task": "capture_images", "area": {"x1": 10, "y1": 10, "z1": 0, "x2": 20, "y2": 20, "z2": 0}, "params": {"interval_s": 5, "frames": 60}, "priority": 1, "max_duration_s": 20.0, "update_interval_s": 1.0},
             {"task": "collect_samples", "area": {"x1": 30, "y1": 5, "z1": 0, "x2": 35, "y2": 10, "z2": 0}, "params": {"depth_mm": 50, "sample_count": 2}, "priority": 2, "max_duration_s": 15.0, "update_interval_s": 1.0},
-            {"task": "env_analysis", "area": {"x1": 85, "y1": 85, "z1": 0, "x2": 150, "y2": 150, "z2": 5}, "params": {"sensors": ["temp", "pressure"], "sampling_rate_s": 10}, "priority": 3, "max_duration_s": 20.0, "update_interval_s": 1.0},
+            {"task": "env_analysis", "area": {"x1": 85, "y1": 85, "z1": 0, "x2": 150, "y2": 150, "z2": 0}, "params": {"sensors": ["temp", "pressure"], "sampling_rate_s": 10}, "priority": 3, "max_duration_s": 20.0, "update_interval_s": 1.0},
         ]
         for m in demos:
             try:
