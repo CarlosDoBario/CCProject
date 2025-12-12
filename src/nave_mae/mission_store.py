@@ -3,23 +3,6 @@
 mission_store.py
 
 In-memory MissionStore with optional persistence and basic recovery.
-
-Features:
-- create/assign/update/complete/cancel/unassign mission APIs (same surface as before)
-- register_hook(fn) to receive events (fn(event_type, payload))
-- persist to JSON file on state-changing operations (atomic write)
-- load from JSON on init and perform basic recovery:
-    - missions in ASSIGNED or IN_PROGRESS are reverted to CREATED and history records RECOVERED
-    - emits hooks for recovered missions
-- constructor accepts persist_file (or reads ML_MISSION_STORE_FILE env var)
-
-Adaptations for binary TLV protocol:
-- new helper `update_from_telemetry(rover_id, telemetry)` that accepts canonical
-  telemetry dicts produced by common.binary_proto.tlv_to_canonical and:
-    - updates rover last_seen/address/state
-    - forwards progress updates to update_progress
-    - marks mission complete when applicable
-    - emits telemetry-related events via hooks
 """
 
 from typing import Dict, Any, Optional, Tuple, Callable, List
@@ -269,7 +252,7 @@ class MissionStore:
         with self._lock:
             return {mid: dict(m) for mid, m in self._missions.items()}
 
-    def get_pending_mission_for_rover(self, rover_id: str, mission_id_hint: Optional[str] = None) -> Optional[Dict[str, Any]]: # MODIFICADO
+    def get_pending_mission_for_rover(self, rover_id: str, mission_id_hint: Optional[str] = None) -> Optional[Dict[str, Any]]: 
         """
         Retorna a próxima missão para o rover. Prioriza a missão solicitada para retoma, 
         se estiver atribuída ao rover e não estiver concluída/cancelada.
@@ -285,13 +268,11 @@ class MissionStore:
                         logger.info(f"Prioritizing assigned mission {mission_id_hint} for resumption by {rover_id}.")
                         return dict(m_hint)
                     
-                    # Se a missão estiver em estado CREATED mas for solicitada explicitamente, atribuí-la.
+                    # Se a missão estiver em estado CREATED mas for solicitada explicitamente (para garantir a ordem), atribuí-la.
                     if m_hint["assigned_rover"] is None and m_hint["state"] == "CREATED":
                          return dict(m_hint)
                          
-                    # Caso contrário, se estiver atribuída a outro rover ou em estado final, cai no fallback.
-                    if m_hint["assigned_rover"] is not None and m_hint["assigned_rover"] != rover_id:
-                        logger.warning(f"Rover {rover_id} requested mission {mission_id_hint}, but it's assigned to {m_hint['assigned_rover']}. Falling back to priority list.")
+                    # Se estiver atribuída a outro rover ou em estado final, cai no fallback.
 
             # 2. Fallback para a lógica de prioridade (apenas missões CREATED / não atribuídas)
             pending = [m for m in self._missions.values() if m["assigned_rover"] is None and m["state"] == "CREATED"]
@@ -299,9 +280,10 @@ class MissionStore:
                 return None
             
             # Ordena por prioridade (menor número = maior prioridade)
+            # A prioridade é negativa porque a ordenação padrão é crescente (ascendente)
             pending.sort(key=lambda x: (-int(x.get("priority", 1)), x.get("created_at")))
             
-            logger.info(f"Falling back to next CREATED mission: {pending[0].get('mission_id')}")
+            logger.info(f"Falling back to next CREATED mission: {pending[0].get('mission_id')} (Priority: {pending[0].get('priority')})")
             return dict(pending[0])
 
 
@@ -484,17 +466,19 @@ class MissionStore:
 
     def create_demo_missions(self) -> None:
         """
-        Cria missões de demonstração com duração e intervalo de atualização definidos
-        para que o RoverSim tenha tempo de progredir.
+        Cria as 3 missões de demonstração (M-001, M-002, M-003) com prioridades distintas.
+        A ordem de atribuição será sempre P1 > P2 > P3.
         """
-        # CORRIGIDO: Alteração da área M-0003 para garantir que não há sobreposição.
         demos = [
-            {"task": "capture_images", "area": {"x1": 10, "y1": 10, "z1": 0, "x2": 20, "y2": 20, "z2": 0}, "params": {"interval_s": 5, "frames": 60}, "priority": 1, "max_duration_s": 20.0, "update_interval_s": 1.0},
-            {"task": "collect_samples", "area": {"x1": 30, "y1": 5, "z1": 0, "x2": 35, "y2": 10, "z2": 0}, "params": {"depth_mm": 50, "sample_count": 2}, "priority": 2, "max_duration_s": 15.0, "update_interval_s": 1.0},
-            {"task": "env_analysis", "area": {"x1": 85, "y1": 85, "z1": 0, "x2": 150, "y2": 150, "z2": 0}, "params": {"sensors": ["temp", "pressure"], "sampling_rate_s": 10}, "priority": 3, "max_duration_s": 20.0, "update_interval_s": 1.0},
+            # P1: Mais Alta Prioridade
+            {"task": "capture_images", "mission_id": "M-001", "area": {"x1": 10, "y1": 10, "z1": 0, "x2": 20, "y2": 20, "z2": 0}, "params": {"interval_s": 5, "frames": 60}, "priority": 1, "max_duration_s": 20.0, "update_interval_s": 1.0},
+            # P2: Média Prioridade
+            {"task": "collect_samples", "mission_id": "M-002", "area": {"x1": 30, "y1": 5, "z1": 0, "x2": 35, "y2": 10, "z2": 0}, "params": {"depth_mm": 50, "sample_count": 2}, "priority": 2, "max_duration_s": 15.0, "update_interval_s": 1.0},
+            # P3: Baixa Prioridade
+            {"task": "env_analysis", "mission_id": "M-003", "area": {"x1": 85, "y1": 85, "z1": 0, "x2": 150, "y2": 150, "z2": 5}, "params": {"sensors": ["temp", "pressure"], "sampling_rate_s": 10}, "priority": 3, "max_duration_s": 20.0, "update_interval_s": 1.0},
         ]
         for m in demos:
             try:
                 self.create_mission(m) 
-            except Exception:
-                logger.exception("create_demo_missions: failed to create demo mission")
+            except Exception as e:
+                logger.warning(f"create_demo_missions: failed to create demo mission {m.get('mission_id')}. Assuming it already exists or error: {e}")

@@ -86,7 +86,7 @@ ML_HOST: str = _parse_str(os.environ.get("ML_HOST"), "0.0.0.0")
 ML_UDP_PORT: int = _parse_int(os.environ.get("ML_UDP_PORT"), 64070)
 
 # API de Observação / Ground Control
-API_HOST: str = _parse_str(os.environ.get("API_HOST"), "0.0.0.0")
+API_HOST: str = _parse_str(os.environ.get("API_HOST"), "127.0.0.1")
 API_PORT: int = _parse_int(os.environ.get("API_PORT"), 65000)
 
 # Datagram sizing (ML)

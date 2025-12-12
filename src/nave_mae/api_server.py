@@ -17,31 +17,31 @@ except ImportError:
     _FASTAPI_AVAILABLE = False
     
 from common import config, utils
-from nave_mae.mission_store import MissionStore
-from nave_mae.telemetry_store import TelemetryStore
+# NOTA: Importamos MissionStore e TelemetryStore mas não os inicializamos a nível global
+# from nave_mae.mission_store import MissionStore
+# from nave_mae.telemetry_store import TelemetryStore
 
 logger = utils.get_logger("nave_mae.api_server")
 
-# --- Instâncias (Injetadas) ---
+# --- Instâncias (Globais, mas inicializadas em run_api_server_uvicorn) ---
 app = FastAPI(title="Nave-Mãe Observação API", version="1.0")
-mission_store: Optional[MissionStore] = None
-telemetry_store: Optional[TelemetryStore] = None
+mission_store: Optional[Any] = None # Usar Any ou remover anotação para evitar problemas de tipo
+telemetry_store: Optional[Any] = None
 
-# --- Helpers de Inicialização ---
 
-def setup_stores(ms: MissionStore, ts: TelemetryStore):
-    """Injeta as instâncias do MissionStore e TelemetryStore."""
-    global mission_store, telemetry_store
-    mission_store = ms
-    telemetry_store = ts
-    logger.info("Stores de Missão e Telemetria injetados no API Server.")
+# --- Helpers de Inicialização (REMOVIDOS setup_stores) ---
 
 # --- Endpoints REST (Requisito do Enunciado) ---
 
 def _force_reload_mission_store():
     """Força o recarregamento do MissionStore do disco para obter o estado atual."""
+    # Garante que mission_store foi inicializado no processo
+    if mission_store is None:
+         logger.warning("MissionStore não inicializado. Tente carregar no run_api_server_uvicorn.")
+         return 
+         
     try:
-        if mission_store and hasattr(mission_store, 'load_from_file'):
+        if hasattr(mission_store, 'load_from_file'):
             mission_store.load_from_file()
     except Exception:
         logger.warning("Falha ao recarregar MissionStore para API request.")
@@ -150,18 +150,43 @@ async def get_latest_telemetry_all():
     return {"latest_telemetry": latest_data}
 
 
-# --- Lógica de Execução com Uvicorn ---
+# --- Lógica de Execução com Uvicorn (CORRIGIDA) ---
 
 def run_api_server_uvicorn():
-    """Inicia o servidor API usando Uvicorn."""
+    """Inicia o servidor API usando Uvicorn, inicializando MissionStore e TelemetryStore localmente."""
     if not _FASTAPI_AVAILABLE:
         sys.exit(1)
-        
-    logger.info("Iniciando API Server (Uvicorn) em http://%s:%d", config.API_HOST, config.API_PORT)
+    
+    # 1. INICIALIZAÇÃO LOCAL DOS STORES (CRÍTICO PARA MULTIPROCESSING)
+    global mission_store, telemetry_store
+
+    class MockStore:
+        def list_missions(self): return {"M-0001": {"mission_id": "M-0001", "state": "CREATED", "task": "capture_images", "priority": 1, "last_progress_pct": 0.0, "history": []}}
+        def list_rovers(self): return {"R-TEST": {"state": "IDLE", "last_seen": utils.now_iso(), "battery_level_pct": 100, "internal_temp_c": 25.0, "current_speed_m_s": 0.0}}
+        def get_rover(self, rid): return self.list_rovers().get(rid)
+        def load_from_file(self): pass 
+    
+    try:
+        # Importações locais para garantir que são carregadas no processo filho
+        from nave_mae.telemetry_store import TelemetryStore
+        from nave_mae.mission_store import MissionStore
+        # Tenta inicializar as stores reais
+        mission_store = MissionStore(persist_file=config.MISSION_STORE_FILE)
+        telemetry_store = TelemetryStore(mission_store=mission_store)
+        logger.info("Stores de Missão e Telemetria inicializados internamente no API Server.")
+    except Exception:
+        logger.error("Could not load real stores. Using Mock API data.")
+        mission_store = MockStore()
+        telemetry_store = MockStore()
+
+    # 2. INICIALIZAÇÃO DO UVICORN
+    host_to_bind = "0.0.0.0" 
+    
+    logger.info("Iniciando API Server (Uvicorn) em http://%s:%d (Acessível via Nave-Mãe IP)", host_to_bind, config.API_PORT)
 
     uvicorn.run(
         app, 
-        host=config.API_HOST, 
+        host=host_to_bind, 
         port=config.API_PORT, 
         log_level=config.LOG_LEVEL.lower(), 
         access_log=False 
@@ -177,27 +202,5 @@ if __name__ == "__main__":
     except Exception:
         logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s [%(name)s] %(message)s")
 
-    # 2. Inicialização dos Stores e Injeção
-    class MockStore:
-        def list_missions(self): return {"M-0001": {"mission_id": "M-0001", "state": "CREATED", "task": "capture_images", "priority": 1, "last_progress_pct": 0.0, "history": []}}
-        def list_rovers(self): 
-            # Mock de dados detalhados para o teste da API
-            return {"R-TEST": {"state": "IDLE", "last_seen": utils.now_iso(), "battery_level_pct": 100, "internal_temp_c": 25.0, "current_speed_m_s": 0.0}}
-        def get_rover(self, rid): return self.list_rovers().get(rid)
-        def load_from_file(self): pass 
-    
-    try:
-        from nave_mae.telemetry_store import TelemetryStore
-        from nave_mae.mission_store import MissionStore
-        ms = MissionStore(persist_file=config.MISSION_STORE_FILE)
-        ts = TelemetryStore(mission_store=ms)
-    except Exception:
-        logger.error("Could not load real stores. Using Mock API data.")
-        ms = MockStore()
-        ts = MockStore()
-
-    # 3. Injeção e Inicialização
-    setup_stores(ms, ts)
-    
-    # Executar o Servidor API
+    # A execução aqui chama diretamente run_api_server_uvicorn, que inicializa as stores
     run_api_server_uvicorn()
