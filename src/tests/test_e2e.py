@@ -72,7 +72,7 @@ def _start_client_in_thread(rover_id: str, server_addr: Tuple[str, int]):
     def _run():
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        client = SimpleMLClient(rover_id=rover_id, server=server_addr, exit_on_complete=True)
+        client = SimpleMLClient(rover_id=rover_id, server=server_addr, exit_on_complete=False)
         info["loop"] = loop
         info["client"] = client
         # create UDP endpoint for the client on an ephemeral local port
@@ -85,6 +85,8 @@ def _start_client_in_thread(rover_id: str, server_addr: Tuple[str, int]):
             loop.create_task(client.request_mission())
             # also schedule retransmit loop so pending retransmits are handled in-client
             loop.create_task(client.retransmit_loop())
+            # A progress loop é a tarefa que estava a dar o aviso 'Task was destroyed'
+            loop.create_task(client._progress_loop()) 
         except Exception:
             # if anything fails here, log but continue -- tests will detect lack of completion
             import logging
@@ -153,11 +155,34 @@ def test_e2e_request_assign_progress_complete(tmp_path):
 
     finally:
         # Stop client if still running
+        client_stop_timeout = 5.0
         try:
             if client and "info" in client and "loop" in client["info"]:
                 loop = client["info"]["loop"]
-                loop.call_soon_threadsafe(loop.stop)
-                client["thread"].join(timeout=2.0)
+                
+                # Rotina para cancelar todas as tarefas (sem parar o loop)
+                async def _cancel_all_tasks():
+                    tasks = [t for t in asyncio.all_tasks(loop)]
+                    for task in tasks:
+                        task.cancel()
+                    await asyncio.gather(*tasks, return_exceptions=True)
+
+                # 1. Agendar a rotina de cancelamento.
+                future_cancel = asyncio.run_coroutine_threadsafe(_cancel_all_tasks(), loop)
+                
+                # 2. Esperar que o cancelamento termine (curto timeout).
+                try:
+                    future_cancel.result(timeout=2.0)
+                except Exception:
+                    # Se houver um TimeoutError ou outro erro, ignorar e avançar.
+                    pass 
+                    
+                # 3. Forçar a paragem do loop de forma thread-safe.
+                loop.call_soon_threadsafe(loop.stop) 
+                    
+                # 4. Esperar que o thread pare, com tempo restante.
+                client["thread"].join(timeout=client_stop_timeout)
+
         except Exception:
             pass
 
