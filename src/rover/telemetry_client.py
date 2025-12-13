@@ -1,18 +1,4 @@
-#!/usr/bin/env python3
-"""
-Telemetry client for rovers (binary TLV over TCP).
-
-Provides:
-- send_once(...) compatibility function (keeps previous behaviour)
-- TelemetryClient: persistent client with automatic reconnect/backoff,
-  reader loop to receive server frames (commands/acks), and a simple
-  on_command(callback) hook for handling server-issued commands.
-
-This file implements a complete CLI entrypoint that accepts:
-  --host, --port, --rover-id, --once, --interval, --ack, --ack-timeout, --crc
-"""
 from __future__ import annotations
-
 import argparse
 import asyncio
 import inspect
@@ -27,7 +13,7 @@ from common import binary_proto, utils, config
 
 logger = utils.get_logger("rover.telemetry_client")
 
-# Keep the old simple send_once API for compatibility with tests/scripts
+
 async def send_once(host: str, port: int, rover_id: str, telemetry: dict, ack_requested: bool = False, ack_timeout: float = 5.0, include_crc: bool = False):
     """
     Open a TCP connection, send a single framed telemetry message and optionally wait for an ACK.
@@ -40,12 +26,8 @@ async def send_once(host: str, port: int, rover_id: str, telemetry: dict, ack_re
             tlvs.append(binary_proto.tlv_position(pos.get("x", 0.0), pos.get("y", 0.0), pos.get("z", 0.0)))
         if "battery_level_pct" in telemetry:
             tlvs.append(binary_proto.tlv_battery_level(int(telemetry.get("battery_level_pct", 0))))
-        # Removida a conversão para TLV_PROGRESS pois progress_pct já não faz parte do output canónico do RoverSim
-        # if "progress_pct" in telemetry:
-        #     tlvs.append(binary_proto.tlv_progress(float(telemetry.get("progress_pct", 0.0))))
         if "status" in telemetry:
             tlvs.append(binary_proto.tlv_status_code(telemetry.get("status", "UNKNOWN")))
-        # include full payload as JSON fallback (inclui temperatura, velocidade, e outros campos não TLV)
         tlvs.append((binary_proto.TLV_PAYLOAD_JSON, json.dumps(telemetry, ensure_ascii=False).encode("utf-8")))
 
         flags = binary_proto.FLAG_ACK_REQUESTED if ack_requested else 0
@@ -57,7 +39,6 @@ async def send_once(host: str, port: int, rover_id: str, telemetry: dict, ack_re
         writer.write(frame)
         await writer.drain()
 
-        # optional: wait for ACK if ack_requested
         if ack_requested:
             try:
                 hdr = await asyncio.wait_for(reader.readexactly(4), timeout=ack_timeout)
@@ -163,7 +144,6 @@ class TelemetryClient:
         try:
             if self._writer:
                 self._writer.close()
-                # guard wait_closed so shutdown doesn't hang indefinitely
                 try:
                     await asyncio.wait_for(self._writer.wait_closed(), timeout=1.0)
                 except Exception:
@@ -191,11 +171,9 @@ class TelemetryClient:
                     logger.info("TelemetryClient %s: connection closed by server", self.rover_id)
                     break
                 except (ConnectionResetError, OSError) as e:
-                    # common on Windows when the server is stopped abruptly
                     logger.info("TelemetryClient %s: connection reset or network error: %s", self.rover_id, e)
                     break
                 except Exception:
-                    # unexpected error reading; log full exception
                     logger.exception("TelemetryClient %s: unexpected error reading from socket", self.rover_id)
                     break
 
@@ -226,14 +204,12 @@ class TelemetryClient:
                 header = parsed.get("header", {})
                 tlvs = parsed.get("tlvs", {})
                 canonical = binary_proto.tlv_to_canonical(tlvs)
-                # include header metadata for callbacks
                 canonical["_msgid"] = header.get("msgid")
                 canonical["_ts_server_sent_ms"] = header.get("timestamp_ms", None)
 
                 msgtype = header.get("msgtype")
                 logger.debug("TelemetryClient %s received msgtype=%s keys=%s", self.rover_id, msgtype, list(canonical.keys()))
 
-                # If server requested ACK, reply with TS_ACK referencing the server msgid
                 try:
                     if header.get("flags") & binary_proto.FLAG_ACK_REQUESTED:
                         try:
@@ -250,16 +226,13 @@ class TelemetryClient:
                 except Exception:
                     logger.exception("TelemetryClient: error checking flags")
 
-                # If message contains payload/json TLV, treat as potential command
                 if binary_proto.TLV_PAYLOAD_JSON in tlvs or binary_proto.TLV_PARAMS_JSON in tlvs:
-                    # Pass canonical payload to callback if provided
                     if self._on_command_cb:
                         try:
                             cb = self._on_command_cb
                             if inspect.iscoroutinefunction(cb):
                                 asyncio.create_task(cb(canonical))
                             else:
-                                # call sync cb in executor to avoid blocking reader loop
                                 loop = asyncio.get_running_loop()
                                 loop.run_in_executor(None, cb, canonical)
                         except Exception:
@@ -284,7 +257,6 @@ class TelemetryClient:
                     else:
                         telemetry = maybe
                 else:
-                    # generate minimal telemetry sample
                     telemetry = {
                         "timestamp_ms": binary_proto.now_ms(),
                         "position": {"x": random.uniform(-5, 5), "y": random.uniform(-5, 5), "z": 0.0},
@@ -312,12 +284,8 @@ class TelemetryClient:
             tlvs.append(binary_proto.tlv_position(pos.get("x", 0.0), pos.get("y", 0.0), pos.get("z", 0.0)))
         if "battery_level_pct" in telemetry:
             tlvs.append(binary_proto.tlv_battery_level(int(telemetry.get("battery_level_pct", 0))))
-        # Removida a conversão para TLV_PROGRESS pois progress_pct já não faz parte do output canónico do RoverSim
-        # if "progress_pct" in telemetry:
-        #     tlvs.append(binary_proto.tlv_progress(float(telemetry.get("progress_pct", 0.0))))
         if "status" in telemetry:
             tlvs.append(binary_proto.tlv_status_code(telemetry.get("status", "UNKNOWN")))
-        # O TLV_PAYLOAD_JSON incluirá todos os campos (posição, bateria, temperatura, velocidade, etc.)
         tlvs.append((binary_proto.TLV_PAYLOAD_JSON, json.dumps(telemetry, ensure_ascii=False).encode("utf-8")))
 
         flags = binary_proto.FLAG_ACK_REQUESTED if ack_requested else 0
@@ -352,7 +320,6 @@ class TelemetryClient:
                     "progress_pct": 0.0,
                 }
             await self.send_telemetry(telemetry, ack_requested=ack_requested, include_crc=include_crc)
-            # small delay to allow server to process and send possible ACKs
             await asyncio.sleep(0.05)
         finally:
             try:
@@ -385,7 +352,6 @@ class TelemetryClient:
                 await self._task
             except asyncio.CancelledError:
                 pass
-        # ensure disconnect
         await self._disconnect()
         logger.info("TelemetryClient %s stopped", self.rover_id)
 
@@ -398,22 +364,17 @@ class TelemetryClient:
         while self._running:
             try:
                 await self._connect()
-                # reset backoff generator by re-creating it on successful connect
                 backoff_gen = utils.exponential_backoff(base=self.backoff_base, factor=self.backoff_factor, max_delay=60.0)
-                # spawn reader and telemetry tasks
                 self._reader_task = asyncio.create_task(self._reader_loop())
                 if self.interval_s and self.interval_s > 0:
                     self._telemetry_task = asyncio.create_task(self._telemetry_loop())
-                # wait until reader task completes (connection closes) or client asked to stop
                 done, pending = await asyncio.wait([self._reader_task], return_when=asyncio.FIRST_COMPLETED)
-                # if reader ended, we'll cleanup and possibly reconnect
                 try:
                     await self._disconnect()
                 except Exception:
                     logger.exception("Error during disconnect cleanup")
             except Exception:
                 logger.exception("TelemetryClient connection error; will retry if configured")
-                # ensure writer/reader cleaned up
                 try:
                     await self._disconnect()
                 except Exception:
@@ -421,16 +382,13 @@ class TelemetryClient:
 
             if not self.reconnect:
                 break
-            # wait according to backoff
             delay = next(backoff_gen)
-            # add jitter
             jitter = max(0.0, random.uniform(-0.5, 0.5))
             sleep_for = max(0.0, delay + jitter)
             logger.info("TelemetryClient %s reconnecting after %.2f s", self.rover_id, sleep_for)
             await asyncio.sleep(sleep_for)
 
 
-# CLI helper to run persistent client until cancelled
 async def _run_persistent(client: 'TelemetryClient'):
     """
     Helper coroutine that starts the persistent client and keeps the process alive
@@ -438,7 +396,6 @@ async def _run_persistent(client: 'TelemetryClient'):
     """
     await client.start()
     try:
-        # Sleep loop; wake periodically to allow clean KeyboardInterrupt handling
         while True:
             await asyncio.sleep(3600)
     except asyncio.CancelledError:
@@ -465,9 +422,7 @@ def main():
     parser.add_argument("--reconnect", action="store_true", help="Enable automatic reconnect for persistent client (default enabled)")
     args = parser.parse_args()
 
-    # Run appropriate mode
     if args.once:
-        # Build a minimal telemetry sample and send once
         sample = {
             "timestamp_ms": binary_proto.now_ms(),
             "position": {"x": 0.0, "y": 0.0, "z": 0.0},
@@ -482,7 +437,6 @@ def main():
         except Exception:
             logger.exception("send_once failed")
     else:
-        # Persistent mode
         client = TelemetryClient(
             rover_id=args.rover_id,
             host=args.host,

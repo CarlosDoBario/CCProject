@@ -1,12 +1,3 @@
-#!/usr/bin/env python3
-"""
-telemetry_persister.py
-
-This module implements a hook for the TelemetryStore to persist telemetry
-data into an NDJSON file (one entry per line) per day.
-
-This is a critical component for data archival (Fase 5).
-"""
 import json
 import os
 from datetime import datetime
@@ -27,17 +18,9 @@ class TelemetryPersister:
         logger.info(f"Telemetry Persister initialized. Saving data to: {self.data_dir}")
 
     def _get_filepath(self, date_str: str) -> str:
-        """
-        Generates the file path for the NDJSON file for a given date.
-        e.g., 'data/telemetry/telemetry-20251210.ndjson'
-        """
         return os.path.join(self.data_dir, f"telemetry-{date_str}.ndjson")
 
     def handle_update(self, event_type: str, payload: dict) -> None:
-        """
-        Hook method called by the TelemetryStore upon receiving new data.
-        Writes the telemetry message to the appropriate daily file.
-        """
         if event_type != "telemetry_update":
             return
 
@@ -75,7 +58,6 @@ class TelemetryPersister:
             logger.exception(f"Error persisting telemetry for {rover_id}")
 
     def __call__(self, event_type: str, payload: dict) -> None:
-        """Makes the object callable as a hook."""
         self.handle_update(event_type, payload)
 
 # Exemplo de como esta classe é usada no Nave-Mãe/startup.py:

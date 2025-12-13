@@ -1,8 +1,3 @@
-#!/usr/bin/env python3
-"""
-ml_server.py (binary ML/UDP version)
-...
-"""
 from __future__ import annotations
 
 import asyncio
@@ -20,11 +15,11 @@ logger = utils.get_logger("nave_mae.ml_server")
 
 
 try:
-    from nave_mae.mission_store import MissionStore  # type: ignore
+    from nave_mae.mission_store import MissionStore
 except Exception:
     logger.warning("nave_mae.mission_store not available; using lightweight fallback")
 
-    # Fallback leve
+    # Fallback 
     class MissionStore:
         def __init__(self, persist_file: Optional[str] = None):
             self.missions = {}
@@ -34,8 +29,7 @@ except Exception:
         def register_rover(self, rover_id, address=None):
             self.rovers[rover_id] = {"rover_id": rover_id, "address": address, "state": "IDLE", "last_seen": utils.now_iso()}
 
-        def get_pending_mission_for_rover(self, rover_id, mission_id_hint=None): # ADICIONADO hint
-            # Lógica simples (não suporta hint)
+        def get_pending_mission_for_rover(self, rover_id, mission_id_hint=None):
             for m in self.missions.values():
                 if m.get("assigned_rover") is None:
                     return m
@@ -140,7 +134,6 @@ class MLServerProtocol(asyncio.DatagramProtocol):
             parsed = binary_proto.parse_ml_datagram(data)
         except Exception as e:
             logger.warning("Failed to parse ML datagram from %s: %s", addr, e)
-            # attempt to reply with an ERROR datagram
             try:
                 err_tlv = (binary_proto.TLV_ERRORS, str(e).encode("utf-8"))
                 err_pkt = binary_proto.pack_ml_datagram(binary_proto.ML_ERROR, "", [err_tlv])
@@ -172,7 +165,6 @@ class MLServerProtocol(asyncio.DatagramProtocol):
         try:
             if rover_id:
                 try:
-                    # mission_store.register_rover might accept address dict or tuple
                     self.mission_store.register_rover(rover_id, address={"ip": addr[0], "port": int(addr[1])})
                     logger.info("Rover %s registered with address %s", rover_id, addr)
                 except TypeError:
@@ -252,11 +244,9 @@ class MLServerProtocol(asyncio.DatagramProtocol):
         except Exception:
             logger.exception("Error handling ML message")
 
-    # ----- handlers and helpers -------------------------------------------------
     def _handle_request_mission(self, rover_id: str, canonical: Dict[str, Any], addr: Tuple[str, int], msgid: int = 0):
         logger.info("Handling REQUEST_MISSION from %s (%s) [MsgID: %s]", rover_id, addr, msgid)
         
-        # NOVO: Tenta extrair o mission_id para resumption/hint
         mission_id_hint = canonical.get("mission_id")
         if mission_id_hint:
             logger.info(f"REQUEST_MISSION includes hint for mission: {mission_id_hint}")
@@ -277,7 +267,7 @@ class MLServerProtocol(asyncio.DatagramProtocol):
             logger.exception("Failed to send ACK for REQUEST_MISSION")
 
 
-        # MODIFICADO: Passa mission_id_hint para get_pending_mission_for_rover
+        # Passa mission_id_hint para get_pending_mission_for_rover
         pending = self.mission_store.get_pending_mission_for_rover(rover_id, mission_id_hint)
 
         if pending is None:
@@ -288,7 +278,7 @@ class MLServerProtocol(asyncio.DatagramProtocol):
             logger.warning("No mission available for %s", rover_id)
             return
         
-        # NOVO: Verifica se a missão já estava atribuída (caso de retoma)
+        # Verifica se a missão já estava atribuída (caso de retoma)
         is_already_assigned = pending.get("assigned_rover") == rover_id and pending["state"] in ("ASSIGNED", "IN_PROGRESS")
 
         if not is_already_assigned:
@@ -315,13 +305,9 @@ class MLServerProtocol(asyncio.DatagramProtocol):
         # Adiciona PARAMS_JSON
         params = pending.get("params", {})
         tlvs.append((binary_proto.TLV_PARAMS_JSON, json.dumps(params).encode("utf-8")))
-
-        # numeric msgid for server->client message (uint64)
         server_msgid = int(time.time() * 1000) & 0xFFFFFFFFFFFFFFFF
         # MISSION_ASSIGN deve pedir ACK para garantir que o rover recebeu a missão
         assign_pkt = binary_proto.pack_ml_datagram(binary_proto.ML_MISSION_ASSIGN, rover_id, tlvs, msgid=server_msgid, flags=binary_proto.FLAG_ACK_REQUESTED)
-
-        # store pending for retransmit & track
         self._send_with_reliability(assign_pkt, addr, message_type="MISSION_ASSIGN", mission_id=pending["mission_id"], msgid=server_msgid)
         logger.info("Sent MISSION_ASSIGN [MsgID: %s] to %s@%s", server_msgid, rover_id, addr)
 
@@ -340,9 +326,6 @@ class MLServerProtocol(asyncio.DatagramProtocol):
         logger.info(f"Progress from {rover_id} on mission {mission_id}: {progress_pct:.1f}%% (Status: {status}, Temp: {temp:.1f}°C, Speed: {speed:.1f}m/s)")
 
         try:
-            # --- CORREÇÃO CRÍTICA (REORGANIZADA): Atualiza o estado detalhado do Rover primeiro ---
-            # Deve ser feito antes de update_progress para garantir que todos os dados 
-            # do rover estão prontos para serem persistidos na chamada final de save_to_file().
             with self.mission_store._lock:
                 r = self.mission_store._rovers.setdefault(rover_id, {"rover_id": rover_id})
                 
@@ -382,10 +365,6 @@ class MLServerProtocol(asyncio.DatagramProtocol):
             logger.exception("mission_store.complete_mission failed")
 
     def send_mission_cancel(self, mission_id: str, reason: Optional[str] = None) -> int:
-        """
-        Send a MISSION_CANCEL to the assigned rover for the given mission_id.
-        Returns the numeric msgid used for the outgoing cancel (key for pending_outgoing).
-        """
         m = self.mission_store.get_mission(mission_id)
         if not m:
             raise ValueError("Unknown mission_id")
@@ -399,7 +378,6 @@ class MLServerProtocol(asyncio.DatagramProtocol):
             tlvs.append((binary_proto.TLV_PARAMS_JSON, json.dumps({"reason": reason}).encode("utf-8")))
 
         server_msgid = int(time.time() * 1000) & 0xFFFFFFFFFFFFFFFF
-        # Use existing ML_CANCEL constant from binary_proto (compatibility with binary_proto naming)
         pkt = binary_proto.pack_ml_datagram(binary_proto.ML_CANCEL, rover_id, tlvs, msgid=server_msgid)
 
         # find rover address if registered
@@ -547,14 +525,7 @@ class MLServerProtocol(asyncio.DatagramProtocol):
             logger.exception("Error in _cleanup_loop")
             raise
 
-    # ----------------------------
-    # New: graceful shutdown API
-    # ----------------------------
     async def stop(self, wait_timeout: float = 2.0) -> None:
-        """
-        Gracefully stop the ML server protocol's background tasks and close the transport.
-        This should be called from the event loop that created/owns the protocol (or awaited via run_coroutine_threadsafe).
-        """
         logger.info("Stopping MLServerProtocol (graceful shutdown)")
 
         # Cancel retransmit/cleanup tasks and await their termination (best-effort)
@@ -572,10 +543,7 @@ class MLServerProtocol(asyncio.DatagramProtocol):
             try:
                 await asyncio.wait_for(asyncio.gather(*[asyncio.shield(t) for t in tasks], return_exceptions=True), timeout=wait_timeout)
             except Exception:
-                # ignore timeouts / cancelled errors, we are forcing shutdown
                 pass
-
-        # Close transport
         try:
             if self.transport:
                 try:
@@ -585,8 +553,6 @@ class MLServerProtocol(asyncio.DatagramProtocol):
                 self.transport = None
         except Exception:
             logger.exception("Error during transport close")
-
-        # Clean internal maps (best-effort)
         try:
             with self._lock:
                 self.pending_outgoing.clear()
@@ -598,10 +564,6 @@ class MLServerProtocol(asyncio.DatagramProtocol):
         logger.info("MLServerProtocol stopped")
 
     def stop_sync(self, wait_timeout: float = 5.0) -> None:
-        """
-        Synchronous wrapper to stop the ML server from another thread.
-        Uses run_coroutine_threadsafe on the loop that owns the protocol (if available).
-        """
         if self._loop is None:
             # nothing scheduled; nothing to stop
             try:
@@ -624,10 +586,7 @@ class MLServerProtocol(asyncio.DatagramProtocol):
             except Exception:
                 pass
 
-# -------------------------------------------------------------------
-# NOVO CÓDIGO DE EXECUÇÃO (main)
-# -------------------------------------------------------------------
-
+            
 async def _run_ml_server_main(server_protocol: MLServerProtocol, store: MissionStore):
     """
     Função assíncrona que inicia e mantém o servidor ML a correr.

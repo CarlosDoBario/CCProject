@@ -101,7 +101,6 @@ async def get_rovers_status():
         
         output[rid] = {
             "rover_id": rid,
-            # NOTA: Usar o estado do RDATA (que vem do MissionStore) para o estado primário.
             "state": rdata.get("state", "UNKNOWN"), 
             "last_seen": rdata.get("last_seen"),
             
@@ -127,7 +126,6 @@ async def get_latest_telemetry_all():
     latest_data = {}
     
     for rid, rdata in rovers_ms.items():
-        # A Telemetria mais "fresca" está no registo do rover do MissionStore
         detailed_data = _get_detailed_telemetry_from_rover_data(rdata)
         
         latest_data[rid] = {
@@ -142,14 +140,11 @@ async def get_latest_telemetry_all():
     return {"latest_telemetry": latest_data}
 
 
-# --- Lógica de Execução com Uvicorn ---
 
 def run_api_server_uvicorn():
     """Inicia o servidor API usando Uvicorn, inicializando MissionStore e TelemetryStore localmente."""
     if not _FASTAPI_AVAILABLE:
         sys.exit(1)
-    
-    # 1. INICIALIZAÇÃO LOCAL DOS STORES (CRÍTICO PARA MULTIPROCESSING)
     global mission_store, telemetry_store
 
     class MockStore:
@@ -171,7 +166,6 @@ def run_api_server_uvicorn():
         mission_store = MockStore()
         telemetry_store = MockStore()
 
-    # 2. INICIALIZAÇÃO DO UVICORN
     host_to_bind = "0.0.0.0" 
     
     logger.info("Iniciando API Server (Uvicorn) em http://%s:%d (Acessível via Nave-Mãe IP)", host_to_bind, config.API_PORT)

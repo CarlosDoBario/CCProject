@@ -3,7 +3,7 @@ import time
 import json
 import logging
 from typing import Dict, Any, List, Optional
-import requests
+import requests  # em comentario para nao dar erro de import. 
 
 from common import config, utils
 

@@ -1,10 +1,3 @@
-#!/usr/bin/env python3
-"""
-mission_store.py
-
-In-memory MissionStore with optional persistence and basic recovery.
-"""
-
 from typing import Dict, Any, Optional, Tuple, Callable, List
 import json
 import os
@@ -57,7 +50,6 @@ class MissionStore:
     """
 
     def __init__(self, persist_file: Optional[str] = None):
-        # allow env var override if not provided
         from common import config
         self.persist_file = persist_file or config.MISSION_STORE_FILE
         self._lock = Lock()
@@ -66,17 +58,14 @@ class MissionStore:
         self._next_mission_seq = 1
         self._hooks: List[Callable[[str, Dict[str, Any]], None]] = []
 
-        # If persist_file exists, attempt to load and recover
         if self.persist_file and os.path.exists(self.persist_file):
             try:
                 self.load_from_file(self.persist_file)
                 logger.info(f"Loaded mission_store from {self.persist_file}")
-                # perform recovery of in-progress/assigned missions
                 self._recover_on_startup()
             except Exception:
                 logger.exception("Failed to load/ recover mission_store")
 
-    # --- Hooks ---------------------------------------------------------------
     def register_hook(self, fn: Callable[[str, Dict[str, Any]], None]) -> None:
         self._hooks.append(fn)
 
@@ -87,7 +76,6 @@ class MissionStore:
             except Exception:
                 logger.exception("hook error")
 
-    # --- Persistence helpers -----------------------------------------------
     def _atomic_write(self, path: str, data: str) -> None:
         """Write data to path atomically (tmp + rename)."""
         dirn = os.path.dirname(path) or "."
@@ -97,7 +85,6 @@ class MissionStore:
                 f.write(data)
                 f.flush()
                 os.fsync(f.fileno())
-            # os.replace is atomic on most platforms
             os.replace(tmppath, path)
         except Exception:
             try:
@@ -130,7 +117,6 @@ class MissionStore:
             self._rovers = payload.get("rovers", {})
             self._next_mission_seq = payload.get("_next_mission_seq", 1)
 
-    # recovery: adjust missions that were in transient states
     def _recover_on_startup(self) -> None:
         recovered = []
         with self._lock:
@@ -139,29 +125,24 @@ class MissionStore:
                 if state in ("ASSIGNED", "IN_PROGRESS"):
                     prev_rover = m.get("assigned_rover")
                     m["assigned_rover"] = None
-                    # Use a clear recovery state in history; keep state as CREATED so it's reapplied
                     m["state"] = "CREATED"
                     m.setdefault("history", []).append({"ts": utils.now_iso(), "type": "RECOVERED", "prev_rover": prev_rover})
                     recovered.append({"mission_id": mid, "prev_rover": prev_rover})
-                    # update rover state if present
                     if prev_rover:
                         self._rovers.setdefault(prev_rover, {})["state"] = "IDLE"
         if recovered:
             logger.info(f"Recovered {len(recovered)} mission(s) on startup: {recovered}")
-            # emit hooks for each recovered mission
             for r in recovered:
                 try:
                     self._emit("mission_recovered", {"mission_id": r["mission_id"], "prev_rover": r["prev_rover"]})
                 except Exception:
                     logger.exception("emit mission_recovered failed")
-            # persist the cleaned state immediately
             try:
                 if self.persist_file:
                     self.save_to_file()
             except Exception:
                 logger.exception("Failed to save mission_store after recovery")
 
-    # --- Rover management ---------------------------------------------------
     def register_rover(self, rover_id: str, address: Optional[Tuple[str, int]] = None) -> None:
         """
         Register or update a rover entry. `address` can be:
@@ -174,7 +155,6 @@ class MissionStore:
             r["rover_id"] = rover_id
             if address:
                 if isinstance(address, dict):
-                    # accept dict form
                     ip = address.get("ip")
                     port = address.get("port")
                     if ip:
@@ -182,13 +162,11 @@ class MissionStore:
                 elif isinstance(address, (tuple, list)) and len(address) >= 2:
                     r["address"] = {"ip": address[0], "port": int(address[1])}
                 else:
-                    # unknown form: store as raw
                     r["address"] = address
             r["last_seen"] = utils.now_iso()
             r.setdefault("state", "IDLE")
         logger.debug(f"Rover registered/updated: {rover_id}")
         self._emit("rover_registered", {"rover_id": rover_id, "address": r.get("address")})
-        # persist
         if self.persist_file:
             self.save_to_file()
 
@@ -199,10 +177,8 @@ class MissionStore:
 
     def list_rovers(self) -> Dict[str, Dict[str, Any]]:
         with self._lock:
-            # return shallow copy
             return {k: dict(v) for k, v in self._rovers.items()}
 
-    # --- Mission lifecycle -------------------------------------------------
     def create_mission(self, mission_spec: Dict[str, Any]) -> str:
         ok, errors = mission_schema.validate_mission_spec(mission_spec)
         if not ok:
@@ -238,7 +214,6 @@ class MissionStore:
             self._missions[mid] = m
         logger.info(f"Created mission {mid} task={m['task']}")
         self._emit("mission_created", {"mission": dict(m)})
-        # persist
         if self.persist_file:
             self.save_to_file()
         return mid
@@ -258,29 +233,20 @@ class MissionStore:
         se estiver atribuída ao rover e não estiver concluída/cancelada.
         """
         with self._lock:
-            # 1. Trata a Dica de Retomada de Missão (Resumption Hint)
             if mission_id_hint:
                 m_hint = self._missions.get(mission_id_hint)
                 if m_hint:
-                    # Se a missão estiver atribuída a este rover e não estiver concluída/cancelada, 
-                    # significa que foi interrompida e o rover está a pedir para a retomar. Priorizar!
                     if m_hint["assigned_rover"] == rover_id and m_hint["state"] in ("ASSIGNED", "IN_PROGRESS"):
                         logger.info(f"Prioritizing assigned mission {mission_id_hint} for resumption by {rover_id}.")
                         return dict(m_hint)
                     
-                    # Se a missão estiver em estado CREATED mas for solicitada explicitamente (para garantir a ordem), atribuí-la.
                     if m_hint["assigned_rover"] is None and m_hint["state"] == "CREATED":
                          return dict(m_hint)
                          
-                    # Se estiver atribuída a outro rover ou em estado final, cai no fallback.
-
-            # 2. Fallback para a lógica de prioridade (apenas missões CREATED / não atribuídas)
             pending = [m for m in self._missions.values() if m["assigned_rover"] is None and m["state"] == "CREATED"]
             if not pending:
                 return None
             
-            # Ordena por prioridade (menor número = maior prioridade)
-            # A prioridade é negativa porque a ordenação padrão é crescente (ascendente)
             pending.sort(key=lambda x: (-int(x.get("priority", 1)), x.get("created_at")))
             
             logger.info(f"Falling back to next CREATED mission: {pending[0].get('mission_id')} (Priority: {pending[0].get('priority')})")
@@ -331,7 +297,6 @@ class MissionStore:
             entry = {"ts": utils.now_iso(), "type": "PROGRESS", "rover": rover_id, "payload": progress_payload}
             m.setdefault("history", []).append(entry)
             m["state"] = "IN_PROGRESS"
-            # store last_progress_pct only if present
             if progress_payload.get("progress_pct") is not None:
                 try:
                     m["last_progress_pct"] = float(progress_payload.get("progress_pct"))
@@ -375,16 +340,10 @@ class MissionStore:
         if self.persist_file:
             self.save_to_file()
 
-    # --- Telemetry integration helper ---------------------------------------
     def update_from_telemetry(self, rover_id: str, telemetry: Dict[str, Any]) -> None:
-        """
-        Integrate canonical telemetry payloads into MissionStore.
-        """
         try:
             with self._lock:
-                # ensure rover entry
                 r = self._rovers.setdefault(rover_id, {"rover_id": rover_id, "state": "IDLE"})
-                # address handling
                 addr = telemetry.get("addr") or telemetry.get("_addr")
                 if addr:
                     if isinstance(addr, dict):
@@ -396,7 +355,6 @@ class MissionStore:
                         r["address"] = {"ip": addr[0], "port": int(addr[1])}
                     else:
                         r["address"] = addr
-                # last_seen
                 if telemetry.get("_ts_server_received_ms") is not None:
                     try:
                         r["last_seen"] = _iso_from_ms(int(telemetry.get("_ts_server_received_ms")))
@@ -404,20 +362,13 @@ class MissionStore:
                         r["last_seen"] = utils.now_iso()
                 else:
                     r["last_seen"] = utils.now_iso()
-                # update state from status if present
                 status = telemetry.get("status")
                 if status:
-                    # store verbatim (string)
                     r["state"] = str(status)
-                # persist rover change will be done after handling mission-specific updates
-
-                # emit telemetry event (before possibly completing mission)
                 self._emit("telemetry", {"rover_id": rover_id, "telemetry": dict(telemetry)})
 
-                # forward mission progress if present
                 mid = telemetry.get("mission_id")
                 prog = telemetry.get("progress_pct")
-                # treat progress numbers liberally: accept int/float/str
                 prog_num = None
                 if prog is not None:
                     try:
@@ -426,14 +377,11 @@ class MissionStore:
                         prog_num = None
 
                 if mid and prog is not None:
-                    # call update_progress (which will persist)
                     try:
-                        # pass the telemetry as the progress payload so history stores useful fields
                         self.update_progress(mid, rover_id, telemetry)
                     except Exception:
                         logger.exception("update_progress from telemetry failed")
 
-                # check completion conditions: explicit status or progress >= 100
                 completed = False
                 if prog_num is not None and prog_num >= 100.0:
                     completed = True
@@ -446,7 +394,6 @@ class MissionStore:
                     except Exception:
                         logger.exception("complete_mission from telemetry failed")
 
-            # persist after telemetry handling (persist inside save_to_file acquires lock internally)
             if self.persist_file:
                 try:
                     self.save_to_file()
@@ -455,7 +402,6 @@ class MissionStore:
         except Exception:
             logger.exception("Unexpected error in update_from_telemetry")
 
-    # --- Convenience / persistence utilities -------------------------------
     def snapshot(self) -> Dict[str, Any]:
         with self._lock:
             return {"missions": {k: dict(v) for k, v in self._missions.items()}, "rovers": {k: dict(v) for k, v in self._rovers.items()}, "_next_mission_seq": self._next_mission_seq}
@@ -470,11 +416,8 @@ class MissionStore:
         A ordem de atribuição será sempre P1 > P2 > P3.
         """
         demos = [
-            # P1: Mais Alta Prioridade
             {"task": "capture_images", "mission_id": "M-001", "area": {"x1": 10, "y1": 10, "z1": 0, "x2": 20, "y2": 20, "z2": 0}, "params": {"interval_s": 5, "frames": 60}, "priority": 1, "max_duration_s": 20.0, "update_interval_s": 1.0},
-            # P2: Média Prioridade
             {"task": "collect_samples", "mission_id": "M-002", "area": {"x1": 30, "y1": 5, "z1": 0, "x2": 35, "y2": 10, "z2": 0}, "params": {"depth_mm": 50, "sample_count": 2}, "priority": 2, "max_duration_s": 15.0, "update_interval_s": 1.0},
-            # P3: Baixa Prioridade
             {"task": "env_analysis", "mission_id": "M-003", "area": {"x1": 85, "y1": 85, "z1": 0, "x2": 150, "y2": 150, "z2": 5}, "params": {"sensors": ["temp", "pressure"], "sampling_rate_s": 10}, "priority": 3, "max_duration_s": 20.0, "update_interval_s": 1.0},
         ]
         for m in demos:

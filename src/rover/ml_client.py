@@ -1,13 +1,3 @@
-#!/usr/bin/env python3
-"""
-Simple ML UDP client (binary) with retransmit, persisted-packet resend and dedupe support.
-
-Features:
-- persistent cache directory support via ML_CLIENT_CACHE_DIR env var
-- _resend_persisted_packets(addr) to read files "<rover_id>-<msgid>.bin" and resend them
-- on receiving ACK for a msgid, remove the corresponding persisted file if present
-- dedupe for incoming messages: if same msgid arrives again, resend the previous ACK bytes
-"""
 from __future__ import annotations
 
 import asyncio
@@ -34,25 +24,19 @@ class SimpleMLClient(asyncio.DatagramProtocol):
         self.server = server
         self.exit_on_complete = exit_on_complete
         self.transport = None
-        # pending: msgid -> (packet, created_at, attempts)
         self.pending: Dict[int, Tuple[bytes, float, int]] = {}
-        # dedupe: seen incoming msgids -> timestamp
         self.seen_msgs: Dict[int, float] = {}
-        # last ACKs sent for incoming msgid -> bytes
         self.last_acks: Dict[int, bytes] = {}
         self.seen_acks = set()
-        # Inicializado em connection_made
         self.loop = None 
         self.seq = random.getrandbits(16)
         self._lock = threading.Lock()
-        # persistent cache dir and map msgid -> Path for persisted packets
         cache_dir = os.environ.get("ML_CLIENT_CACHE_DIR", "")
         self.cache_dir = Path(cache_dir) if cache_dir else None
         self._persisted_files: Dict[int, Path] = {}
 
     def connection_made(self, transport):
         self.transport = transport
-        # Obter o loop aqui, onde é garantido que está a correr no thread principal
         self.loop = asyncio.get_event_loop() 
         logger.info("ML client connected on %s", transport.get_extra_info("sockname"))
 
@@ -68,13 +52,11 @@ class SimpleMLClient(asyncio.DatagramProtocol):
         tlvs = parsed.get("tlvs", {})
         canonical = binary_proto.tlv_to_canonical(tlvs)
 
-        # Extract numeric incoming msgid for dedupe behavior
         try:
             incoming_msgid = int(header.get("msgid") or 0)
         except Exception:
             incoming_msgid = 0
 
-        # If duplicate: resend last ACK if available and skip processing
         if incoming_msgid and incoming_msgid in self.seen_msgs:
             last = self.last_acks.get(incoming_msgid)
             if last and self.transport:
@@ -87,11 +69,9 @@ class SimpleMLClient(asyncio.DatagramProtocol):
                 logger.debug("Duplicate incoming msg %s but no stored ACK to resend", incoming_msgid)
             return
 
-        # mark seen
         if incoming_msgid:
             self.seen_msgs[incoming_msgid] = time.time()
 
-        # handle ACKs: TLV_ACKED_MSG_ID (server acknowledging our outgoing messages)
         acked_bytes = tlvs.get(binary_proto.TLV_ACKED_MSG_ID, [])
         if acked_bytes:
             try:
@@ -100,7 +80,6 @@ class SimpleMLClient(asyncio.DatagramProtocol):
                     if acked in self.pending:
                         self.pending.pop(acked, None)
                         logger.info("Received ACK for outgoing msg %s", acked)
-                    # remove persisted file if present
                     pf = self._persisted_files.pop(int(acked), None)
                 if pf:
                     try:
@@ -113,7 +92,6 @@ class SimpleMLClient(asyncio.DatagramProtocol):
             except Exception:
                 logger.exception("Failed to unpack ACKed msgid")
 
-        # mission assign handling - send ACK back (keep behavior)
         if code == binary_proto.ML_MISSION_ASSIGN:
             mission_id = canonical.get("mission_id")
             logger.info("Received MISSION_ASSIGN %s", mission_id)
@@ -129,29 +107,23 @@ class SimpleMLClient(asyncio.DatagramProtocol):
                     server_msgid = 0
 
                 ack_tlv = (binary_proto.TLV_ACKED_MSG_ID, struct.pack(">Q", int(server_msgid) & 0xFFFFFFFFFFFFFFFF))
-                # O msgid do ACK não é relevante para a fiabilidade, 0 é aceitável
                 ack_pkt = binary_proto.pack_ml_datagram(binary_proto.ML_ACK, self.rover_id, [ack_tlv], msgid=0)
 
-                # send ACK e armazena-o para deduplicação
                 if self.transport:
                     try:
                         self.transport.sendto(ack_pkt, addr)
                         logger.debug("Sent ACK for assign msgid=%s to %s", server_msgid, addr)
                     except Exception:
                         logger.exception("Failed to send ACK for assign")
-                # store copy of the ACK to allow exact re-send on duplicates
                 if incoming_msgid:
                     self.last_acks[incoming_msgid] = ack_pkt
 
             except Exception:
                 logger.exception("Error while sending ACK for MISSION_ASSIGN")
 
-            # schedule handling / progress loop 
             if self.loop:
-                # Criar a task diretamente no loop existente
                 self.loop.create_task(self._progress_loop(mission_id))
             else:
-                # Fallback em testes: threading (NÃO RECOMENDADO EM PRODUÇÃO)
                 logger.error("Cannot start _progress_loop: no event loop available. Starting in new thread.")
                 def _start_loop_in_thread():
                     loop = asyncio.new_event_loop()
@@ -172,16 +144,12 @@ class SimpleMLClient(asyncio.DatagramProtocol):
 
     async def start(self):
         loop = asyncio.get_event_loop()
-        # Bind to 0.0.0.0 para aceitar respostas de loopback de forma fiável
         transport, protocol = await loop.create_datagram_endpoint(lambda: self, local_addr=('0.0.0.0', 0), family=socket.AF_INET)
         self.transport = transport
         
-        # Resend packets from cache (se houver)
         self._resend_persisted_packets(self.server) 
         
-        # Envia a primeira REQUEST_MISSION
         await self.request_mission()
-        # Inicia o loop de retransmissão
         asyncio.create_task(self.retransmit_loop())
 
     async def request_mission(self):
@@ -204,19 +172,14 @@ class SimpleMLClient(asyncio.DatagramProtocol):
 
     async def _progress_loop(self, mission_id: str):
         progress = 0.0
-        # Simulação de progresso
         while progress < 100.0:
-            # Envio de progress a cada 2.0s para fins de teste
             await asyncio.sleep(2.0) 
             progress = min(100.0, progress + random.uniform(10, 40))
-            
-            # Nota: Este é um progresso SIMULADO, não usa o RoverSim.step()
             
             tlvs = []
             tlvs.append((binary_proto.TLV_MISSION_ID, mission_id.encode("utf-8")))
             tlvs.append(binary_proto.tlv_progress(progress))
             
-            # Adiciona dados simulados de Telemetria/Posição no PROGRESS
             x, y = random.uniform(-5,5), random.uniform(-5,5)
             batt = random.randint(20,100)
             temp = random.uniform(25.0, 35.0)
@@ -225,7 +188,6 @@ class SimpleMLClient(asyncio.DatagramProtocol):
             tlvs.append(binary_proto.tlv_position(x, y, 0.0))
             tlvs.append(binary_proto.tlv_battery_level(batt))
             
-            # Inclui dados de Temperatura e Velocidade via TLV_PARAMS_JSON (para fins de teste)
             custom_params = {
                  "internal_temp_c": round(temp, 1),
                  "current_speed_m_s": round(speed, 1),
@@ -247,7 +209,6 @@ class SimpleMLClient(asyncio.DatagramProtocol):
             except Exception:
                 logger.exception("Failed to send PROGRESS")
                 
-        # send complete
         tlvs = [(binary_proto.TLV_MISSION_ID, mission_id.encode("utf-8")), (binary_proto.TLV_PARAMS_JSON, b'{"result":"success"}')]
         msgid = random.getrandbits(48)
         pkt = binary_proto.pack_ml_datagram(binary_proto.ML_MISSION_COMPLETE, self.rover_id, tlvs, flags=binary_proto.FLAG_ACK_REQUESTED, seqnum=self.seq, msgid=msgid)
@@ -317,7 +278,6 @@ class SimpleMLClient(asyncio.DatagramProtocol):
             with self._lock:
                 items = list(self.pending.items())
             for mid, (pkt, created, attempts) in items:
-                # Usa backoff exponencial
                 timeout = config.TIMEOUT_TX_INITIAL * (config.BACKOFF_FACTOR ** (attempts - 1))
                 if now - created > timeout:
                     if attempts <= config.N_RETX:
@@ -338,7 +298,6 @@ class SimpleMLClient(asyncio.DatagramProtocol):
             await asyncio.sleep(0.5)
 
 
-# CLI entrypoint
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--rover-id", required=True)
@@ -349,13 +308,10 @@ def main():
     
     client = SimpleMLClient(args.rover_id, (args.server, args.port), exit_on_complete=args.exit_on_complete)
     
-    # NOVO CÓDIGO DE EXECUÇÃO CORRIGIDO
     async def _run_client_main(client_protocol):
         await client_protocol.start()
-        # Mantém o loop a correr até ser interrompido
         try:
             while True:
-                # Sleep por um longo período, mas permite que o loop processe I/O e tasks
                 await asyncio.sleep(3600) 
         except asyncio.CancelledError:
             pass
@@ -371,7 +327,6 @@ def main():
 
 
 if __name__ == "__main__":
-    # Configuração explícita de logging para garantir output imediato
     import logging
     try:
         from common import config

@@ -1,22 +1,3 @@
-#!/usr/bin/env python3
-"""
-telemetry_server.py
-
-TelemetryStream (TS) TCP server using the binary TLV format.
-
-Behaviour:
-- Listens for TCP connections from rovers.
-- Each message is framed with a 4-byte big-endian length prefix followed by a payload.
-- Payload parsed via common.binary_proto.parse_ts_payload -> canonical fields
-- Calls mission_store.register_rover(...) and telemetry_store.update(...) with canonical payload.
-- Replies optional ACK when header flags ask for ACK (ACK TLV with acked msgid).
-
-Enhancements in this version:
-- Treats ConnectionResetError / OSError as expected disconnects (no noisy tracebacks).
-- Tracks client handler tasks so stop() can cancel and await them for a clean shutdown.
-- Ensures pending ACK futures are cancelled on shutdown to avoid resource leaks.
-- stop() initiates shutdown quickly by force-closing transports and scheduling a background cleanup.
-"""
 from __future__ import annotations
 
 import asyncio
@@ -35,16 +16,10 @@ class TelemetryServer:
         self.host = host
         self.port = port
         self._server: Optional[asyncio.base_events.Server] = None
-        # self._loop = asyncio.get_event_loop() # REMOVIDO: Causa o RuntimeError
         self.mission_store = mission_store
         self.telemetry_store = telemetry_store
-
-        # Map rover_id -> StreamWriter for connected clients (last writer wins)
         self._clients: Dict[str, asyncio.StreamWriter] = {}
-        # Pending ACK futures keyed by msgid (uint64)
         self._pending_acks: Dict[int, asyncio.Future] = {}
-
-        # Track active client handler tasks so we can cancel/await them on stop
         self._client_tasks: Set[asyncio.Task] = set()
         self._stopping = False
 
@@ -54,28 +29,18 @@ class TelemetryServer:
 
     # --- Stop is designed to return quickly and schedule background cleanup to avoid blocking tests ---
     async def stop(self) -> None:
-        """
-        Initiate server shutdown quickly and return.
-
-        This function performs an immediate close/abort of client connections to
-        ensure clients observe the disconnect promptly, then schedules a background
-        cleanup task that will await wait_closed() and cancel pending futures with
-        short timeouts. This avoids blocking the caller (tests) while ensuring
-        resources are reclaimed eventually.
-        """
         if self._stopping:
             logger.debug("TelemetryServer.stop() called but already stopping")
             return
         self._stopping = True
         logger.info("TelemetryServer: initiating stop()")
 
-        # Stop accepting new connections
+        # Nao aceita novas ligacoes
         if self._server:
             try:
                 self._server.close()
             except Exception:
                 logger.exception("Error closing server socket (close call)")
-            # schedule server.wait_closed in background to complete close
             try:
                 loop = asyncio.get_running_loop()
                 async def _await_server_closed(srv):
@@ -88,11 +53,10 @@ class TelemetryServer:
                 pass
             self._server = None
 
-        # Snapshot current writers/tasks
         writers = list(self._clients.values())
         tasks = list(self._client_tasks)
 
-        # Force-close underlying transports and call writer.close() to prompt immediate disconnect
+        # Força o encerramento das ligacoes dos clientes
         if writers:
             logger.info("TelemetryServer: force-closing %d client connection(s) to prompt client disconnect", len(writers))
         for w in writers:
@@ -104,7 +68,6 @@ class TelemetryServer:
                         transport.abort()
                     except Exception:
                         pass
-                # fallback: try to close underlying socket if accessible
                 try:
                     sock = w.get_extra_info("socket")
                     if sock:
@@ -118,15 +81,12 @@ class TelemetryServer:
                             pass
                 except Exception:
                     pass
-                # polite close (won't block here)
                 try:
                     w.close()
                 except Exception:
                     pass
             except Exception:
                 pass
-
-        # Cancel client handler tasks (they should wake up after transport abort); do not block long here
         if tasks:
             logger.debug("TelemetryServer: cancelling %d client handler task(s)", len(tasks))
             for t in tasks:
@@ -138,20 +98,17 @@ class TelemetryServer:
         # Schedule background cleanup to await wait_closed() and clear pending futures
         async def _background_cleanup(writers_snapshot, tasks_snapshot):
             try:
-                # Give tasks a short window to finish after cancellation
                 if tasks_snapshot:
                     try:
                         await asyncio.wait_for(asyncio.gather(*tasks_snapshot, return_exceptions=True), timeout=1.0)
                     except Exception:
                         # ignore timeouts/exceptions; proceed
                         pass
-                # Wait briefly for writer.wait_closed to finish (short timeout)
                 for w2 in writers_snapshot:
                     try:
                         await asyncio.wait_for(w2.wait_closed(), timeout=0.5)
                     except Exception:
                         pass
-                # Cancel pending ack futures
                 if self._pending_acks:
                     logger.debug("TelemetryServer: cancelling %d pending ack future(s) in background cleanup", len(self._pending_acks))
                 for mid, fut in list(self._pending_acks.items()):
@@ -161,7 +118,6 @@ class TelemetryServer:
                     except Exception:
                         pass
                     self._pending_acks.pop(mid, None)
-                # Clear tracking sets/maps
                 try:
                     self._client_tasks.difference_update(tasks_snapshot)
                 except Exception:
@@ -187,12 +143,6 @@ class TelemetryServer:
         logger.info("TelemetryServer: stop() initiated (returning to caller)")
 
     async def _handle_client(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
-        """
-        Handler for a single client connection.
-        This reads framed messages (4-byte length prefix) and dispatches them.
-        It treats socket-level ConnectionResetError/OSError as expected
-        disconnects and logs them at INFO level (no noisy stacktraces).
-        """
         peer = writer.get_extra_info("peername")
         logger.debug("TS handler connected from %s", peer)
         rover_id: Optional[str] = None
@@ -212,11 +162,9 @@ class TelemetryServer:
                     logger.info("Connection closed by %s", peer)
                     break
                 except (ConnectionResetError, OSError) as e:
-                    # Common on Windows when the peer disappears; treat as normal disconnect
                     logger.info("Connection reset / network error from %s: %s", peer, e)
                     break
                 except Exception:
-                    # Unexpected error: log full exception for debugging
                     logger.exception("Unexpected error in TS handler for %s", peer)
                     break
 
@@ -250,14 +198,13 @@ class TelemetryServer:
                 header = parsed.get("header", {})
                 tlvs = parsed.get("tlvs", {})
                 rid = parsed.get("rover_id")
-                # update rover mapping if not yet present
+                # update rover mapping if not yet registado
                 if rid and rid not in self._clients:
                     try:
                         self._clients[rid] = writer
                         logger.info("TS connection from %s", peer)
                         # if telemetry/mission hooks exist, propagate registration
                         if self.telemetry_store and hasattr(self.telemetry_store, "register_rover"):
-                            # some stores expose helpers; best effort
                             try:
                                 self.telemetry_store.register_rover(rid, peer)
                             except Exception:
@@ -268,19 +215,15 @@ class TelemetryServer:
                 # Dispatch on msgtype
                 msgtype = header.get("msgtype")
                 if msgtype == binary_proto.TS_TELEMETRY:
-                    # convert TLVs to canonical and notify telemetry store/mission_store hooks
                     try:
                         canonical = binary_proto.tlv_to_canonical(tlvs)
                         canonical["_msgid"] = header.get("msgid")
                         canonical["_ts_server_received_ms"] = binary_proto.now_ms()
-
-                        # NOVO CÓDIGO: Log da Telemetria para o terminal da Nave-Mãe (requisito do utilizador)
                         # Campos necessários: ID do Rover, Posição (x, y, z), Estado Operacional, Bateria (%), Velocidade (m/s), Temperatura interna
                         rover_id_log = rid or "UNKNOWN"
                         pos = canonical.get("position", {"x": 0.0, "y": 0.0, "z": 0.0})
                         status = canonical.get("status", "N/A")
                         battery = canonical.get("battery_level_pct", 0.0)
-                        # Os novos campos (velocidade e temperatura) são extraídos do 'canonical' (proveniente do TLV_PAYLOAD_JSON)
                         speed = canonical.get("current_speed_m_s", 0.0) 
                         temp = canonical.get("internal_temp_c", 0.0)
 
@@ -292,8 +235,7 @@ class TelemetryServer:
                             f"Velocidade: {speed:.1f} m/s | "
                             f"Temperatura: {temp:.1f} °C"
                         )
-                        print(log_line) # Saída direta para o terminal da Nave-Mãe.
-                        # FIM DO NOVO CÓDIGO
+                        print(log_line)
 
                         errors = canonical.get("errors") or []
                         if any(err.get("code") == "BAT-EMERGENCY-ABORT" for err in errors):
@@ -301,15 +243,11 @@ class TelemetryServer:
                                          rid, canonical.get("battery_level_pct", 0.0))
                             # Note: O rover já abortou a missão e está a regressar ao posto de carregamento.
                             # Esta é apenas a notificação crítica para a Nave Mãe/Ground Control.
-                        
-                        # TelemetryStore expected hook signature may differ; try common ones
                         if self.telemetry_store and hasattr(self.telemetry_store, "update"):
                             try:
                                 self.telemetry_store.update(rid, canonical)
                             except Exception:
-                                # fallback: if telemetry_store has register_hook style, call hooks externally
                                 pass
-                        # MissionStore update: register last seen / state
                         if self.mission_store and hasattr(self.mission_store, "update_rover"):
                             try:
                                 self.mission_store.update_rover(rid, canonical)
@@ -360,12 +298,6 @@ class TelemetryServer:
                 pass
 
     async def send_command(self, rover_id: str, command: dict, expect_ack: bool = False, timeout: float = 5.0) -> Optional[bool]:
-        """
-        Send a command (as payload JSON TLV) to a connected rover.
-        If expect_ack is True, wait for a TS_ACK referencing the generated msgid and return True on ack.
-        Raises KeyError if the rover is not connected.
-        Raises asyncio.TimeoutError on ack timeout.
-        """
         if rover_id not in self._clients:
             raise KeyError(rover_id)
         peer_writer = self._clients[rover_id]
@@ -394,10 +326,7 @@ class TelemetryServer:
 
     def get_connected_rovers(self) -> list:
         return list(self._clients.keys())
-        
-# -------------------------------------------------------------------
-# NOVO CÓDIGO DE EXECUÇÃO (main) CORRIGIDO
-# -------------------------------------------------------------------
+
 
 async def _run_server_main(server: TelemetryServer):
     """
@@ -424,12 +353,7 @@ def main():
         config.configure_logging()
         port = config.TELEMETRY_PORT
         host = config.TELEMETRY_HOST
-        
-        # Para que o servidor aceite ligações do exterior (como acontece no CORE) ou do 127.0.0.1 (local)
-        # O host é definido como 0.0.0.0 se não for explicitamente definido para ser mais restritivo.
         server = TelemetryServer(host="0.0.0.0", port=port)
-
-        # Usa asyncio.run para configurar e executar o loop do evento.
         asyncio.run(_run_server_main(server))
 
     except KeyboardInterrupt:
