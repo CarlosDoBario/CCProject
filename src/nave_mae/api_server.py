@@ -8,9 +8,9 @@ from typing import Dict, Any, List, Optional, Tuple, Callable
 
 # Importações FastAPI/Uvicorn
 try:
-    from fastapi import FastAPI, WebSocket, WebSocketDisconnect # type: ignore
-    from fastapi.responses import JSONResponse # type: ignore
-    import uvicorn # type: ignore
+    from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+    from fastapi.responses import JSONResponse
+    import uvicorn
     _FASTAPI_AVAILABLE = True
 except ImportError:
     logging.error("FastAPI/Uvicorn não estão instalados. Instala com: pip install fastapi[all] uvicorn")
@@ -25,13 +25,8 @@ logger = utils.get_logger("nave_mae.api_server")
 
 # --- Instâncias (Globais, mas inicializadas em run_api_server_uvicorn) ---
 app = FastAPI(title="Nave-Mãe Observação API", version="1.0")
-mission_store: Optional[Any] = None # Usar Any ou remover anotação para evitar problemas de tipo
+mission_store: Optional[Any] = None 
 telemetry_store: Optional[Any] = None
-
-
-# --- Helpers de Inicialização (REMOVIDOS setup_stores) ---
-
-# --- Endpoints REST (Requisito do Enunciado) ---
 
 def _force_reload_mission_store():
     """Força o recarregamento do MissionStore do disco para obter o estado atual."""
@@ -83,8 +78,6 @@ async def get_missions_list():
             "progress_pct": m.get("last_progress_pct", 0.0), 
             "priority": m.get("priority"),
             "assigned_rover": m.get("assigned_rover"),
-            
-            # ADICIONADO: Incluir campos de especificação da missão para o Ground Control
             "area": m.get("area"),
             "max_duration_s": m.get("max_duration_s"),
             "update_interval_s": m.get("update_interval_s"),
@@ -104,7 +97,6 @@ async def get_rovers_status():
     output = {}
     
     for rid, rdata in rovers_ms.items():
-        # Extrair dados detalhados usando a nova lógica
         detailed_data = _get_detailed_telemetry_from_rover_data(rdata)
         
         output[rid] = {
@@ -150,7 +142,7 @@ async def get_latest_telemetry_all():
     return {"latest_telemetry": latest_data}
 
 
-# --- Lógica de Execução com Uvicorn (CORRIGIDA) ---
+# --- Lógica de Execução com Uvicorn ---
 
 def run_api_server_uvicorn():
     """Inicia o servidor API usando Uvicorn, inicializando MissionStore e TelemetryStore localmente."""
