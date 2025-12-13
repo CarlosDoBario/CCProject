@@ -66,11 +66,11 @@ class GroundControlClient:
             temp = status.get('internal_temp_c', 0.0)
             speed = status.get('current_speed_m_s', 0.0)
             
-            # Posição, obtida diretamente do payload do API Server (inclui Z)
+            # Posição, obtida diretamente do payload do API Server 
             pos = status.get('position', {"x": 0.0, "y": 0.0, "z": 0.0})
             
-            # Lógica de Estado (IDLE, MOVING, IN_MISSION, COOLING, CHARGING)
-            state_raw = status.get('status', 'DESCONHECIDO').upper() # Usar 'status' detalhado da telemetria
+            # Lógica de Estado 
+            state_raw = status.get('status', 'DESCONHECIDO').upper() 
             if state_raw in ('CHARGING_TRAVEL', 'TRAVELING_TO_CHARGE', 'MOVING_TO_MISSION', 'MOVING'):
                 display_state = 'MOVING'
             elif state_raw in ('IN_MISSION', 'RUNNING'):
@@ -103,7 +103,6 @@ class GroundControlClient:
         if not missions_list:
             return "   [Nenhuma Missão Criada]\n"
             
-        # Alterado o cabeçalho
         output = ["\n--- MISSÕES (Área & Duração) ---"]
         
         # Ordenação por estado e prioridade
@@ -116,12 +115,11 @@ class GroundControlClient:
             progress = mission.get('progress_pct', 0.0)
             task = mission.get('task', 'N/A')
             
-            # Extrair e formatar Área e Duração (agora disponíveis a partir do API Server)
+            # Extrair e formatar Área e Duração
             area_data = mission.get('area')
             duration_s = mission.get('max_duration_s') 
             
             if area_data and isinstance(area_data, dict):
-                # Incluir Z1 e Z2 na formatação
                 area_str = (
                     f"Area: ({area_data.get('x1', 0.0):.1f}, {area_data.get('y1', 0.0):.1f}, {area_data.get('z1', 0.0):.1f}) "
                     f"-> ({area_data.get('x2', 0.0):.1f}, {area_data.get('y2', 0.0):.1f}, {area_data.get('z2', 0.0):.1f})"
@@ -146,14 +144,14 @@ class GroundControlClient:
         return "\n".join(output)
 
     def run(self):
-        """Loop principal de polling - Retornando à lógica sequencial de impressão."""
+        """Loop principal de polling """
         while True:
             logger.info("Polling API...")
             
             # 1. Obter todas as missões (Retorna LISTA)
             missions_raw = self._fetch_api('/api/missions')
             
-            # 2. Obter o estado agregado dos rovers (Retorna DICIONÁRIO)
+            # 2. Obter o estado agregado dos rovers 
             rovers_data = self._fetch_api('/api/rovers')
 
             # --- Processamento e Exibição ---
@@ -164,17 +162,11 @@ class GroundControlClient:
             print("\n" + "="*50)
             print("         GROUND CONTROL DASHBOARD         ")
             print("="*50)
-            
-            # Exibir Postos de Carregamento
             print(self._format_charging_stations())
-
-            # Exibir Missões (com Área e Duração)
             if missions_list:
                 print(self._format_missions(missions_list))
             else:
                 print("\n--- MISSÕES ---\n   [Erro ao carregar ou Nenhuma Missão]")
-
-            # Exibir Estado dos Rovers (com Telemetria Consolidada)
             if rovers_data_dict:
                 print(self._format_rovers(rovers_data_dict))
             else:
@@ -186,7 +178,6 @@ class GroundControlClient:
 
 
 if __name__ == "__main__":
-    # Configuração explícita de logging para garantir output imediato
     import logging
     try:
         from common import config
