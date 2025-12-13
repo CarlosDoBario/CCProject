@@ -3,26 +3,22 @@
 tests/test_telemetry_persistence.py
 
 Integration test that demonstrates NDJSON persistence of telemetry via a simple hook.
-
-This test:
- - starts an in-process TelemetryServer (via telemetry_launcher.start_telemetry_server)
- - attaches a small hook to the TelemetryStore that appends canonical records as NDJSON
-   lines into a daily file under a temporary directory
- - sends a few telemetry messages using rover.telemetry_client.send_once
- - asserts that the NDJSON file was created and contains the expected records
-
-This test purposefully keeps the persistence implementation simple and local to the test,
-so it does not depend on scripts/persist_telemetry.py being present.
+- This test directly instantiates TelemetryServer and TelemetryStore.
+- It asserts that the NDJSON file was created and contains the expected records.
 """
 import asyncio
 import json
 import time
 from pathlib import Path
+from typing import Dict, Any, List
 
 import pytest
 
 from common import binary_proto
-from nave_mae.telemetry_launcher import start_telemetry_server
+# ADICIONADO: Importar classes diretamente
+from nave_mae.telemetry_server import TelemetryServer
+from nave_mae.telemetry_store import TelemetryStore
+from nave_mae.mission_store import MissionStore # Necessário para TelemetryStore
 from rover.telemetry_client import send_once
 
 
@@ -31,57 +27,74 @@ async def test_telemetry_persistence_ndjson(tmp_path):
     outdir = tmp_path / "telemetry"
     outdir.mkdir(parents=True, exist_ok=True)
 
-    # Start telemetry server in-process and obtain TelemetryStore
-    services = await start_telemetry_server(mission_store=None, telemetry_store=None, host="127.0.0.1", port=0, persist_file=None)
-    server = services.get("telemetry_server")
-    ts = services.get("ts")
-    assert server is not None, "TelemetryServer not started by telemetry_launcher"
-    assert ts is not None, "TelemetryStore not started by telemetry_launcher"
-
+    # 1. SETUP: Iniciar TelemetryServer e obter TelemetryStore
+    ms = MissionStore()
+    ts = TelemetryStore(mission_store=ms) 
+    
+    # Inicia o servidor em processo, obtendo a porta efêmera (port=0)
+    server = TelemetryServer(mission_store=ms, telemetry_store=ts, host="127.0.0.1", port=0)
+    await server.start()
+    
     sock = server._server.sockets[0]
     host, port = sock.getsockname()[:2]
+    
+    assert server is not None, "TelemetryServer failed to start"
+    assert ts is not None, "TelemetryStore failed to initialize"
 
-    # Create a simple NDJSON hook that writes records to the outdir based on timestamp date
+
+    # 2. Criar e registar o hook de persistência NDJSON
     def simple_persist_hook(event_type: str, payload: dict):
+        # Apenas processa eventos de atualização de telemetria
+        if event_type != "telemetry_update":
+             return
+
         try:
-            # payload shape often {"rover_id": rid, "telemetry": {...}}
-            if isinstance(payload, dict) and "telemetry" in payload and isinstance(payload["telemetry"], dict):
-                tel = dict(payload["telemetry"])
-                rid = payload.get("rover_id") or tel.get("rover_id") or "<unknown>"
-            elif isinstance(payload, dict) and "rover_id" in payload and "telemetry" not in payload:
+            # O payload esperado é {"rover_id": rid, "telemetry": {canonical_payload}}
+            # Se o TelemetryStore emitir "telemetry_update", o payload é a telemetria canónica
+            # (Verifique o TelemetryStore._emit na linha 141)
+            # O TelemetryStore._emit envia: self._emit("telemetry_update", {"rover_id": rover_id, "telemetry": telemetry})
+            
+            tel: Dict[str, Any]
+            if "telemetry" in payload and isinstance(payload["telemetry"], dict):
                 rid = payload.get("rover_id")
-                tel = dict(payload)
+                tel = payload["telemetry"]
             else:
-                rid = payload.get("rover_id") if isinstance(payload, dict) else "<unknown>"
-                tel = payload if isinstance(payload, dict) else {"value": str(payload)}
+                 # Fallback/Erro de formato de hook
+                 rid = payload.get("rover_id", "<unknown>")
+                 tel = payload
+
 
             ts_ms = int(tel.get("ts_ms") or tel.get("timestamp_ms") or int(time.time() * 1000))
+            rid = rid or tel.get("rover_id") or "<unknown>" # Garante que o ID está presente
+
             rec = {
                 "ts_ms": ts_ms,
                 "rover_id": rid,
+                # Campos chave
                 "position": tel.get("position"),
                 "progress_pct": tel.get("progress_pct"),
                 "battery_level_pct": tel.get("battery_level_pct"),
                 "status": tel.get("status"),
-                "payload_json": tel,
+                # Incluir o payload completo para debugging
+                "payload_json": tel, 
             }
             ymd = time.strftime("%Y%m%d", time.gmtime(ts_ms / 1000.0))
             fname = outdir / f"telemetry-{ymd}.ndjson"
+            
             # append JSON line (sync, small writes acceptable for test)
             with open(fname, "a", encoding="utf-8") as fh:
                 fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
-        except Exception:
-            # In tests, we want errors to surface; re-raise to fail early
-            raise
+                
+        except Exception as e:
+            # Em testes, queremos que os erros sejam lançados
+            raise AssertionError(f"Error in simple_persist_hook: {e}") from e
 
-    # Register hook on TelemetryStore if API available
-    if hasattr(ts, "register_hook"):
-        ts.register_hook(simple_persist_hook)
-    else:
-        # If the TelemetryStore implementation doesn't support hooks, skip the test
-        pytest.skip("TelemetryStore.register_hook API not available in this implementation")
+    # Register hook on TelemetryStore 
+    # O TelemetryStore tem o método register_hook.
+    ts.register_hook(simple_persist_hook)
 
-    # Send telemetry messages for three distinct rover ids
+
+    # 3. Enviar Telemetria e Esperar Processamento
     rover_ids = ["R-P-1", "R-P-2", "R-P-3"]
     for rid in rover_ids:
         telemetry = {
@@ -92,27 +105,34 @@ async def test_telemetry_persistence_ndjson(tmp_path):
             "progress_pct": 10.0,
         }
         await send_once(host, port, rid, telemetry, ack_requested=False, include_crc=False)
-        # tiny pause to allow server to process and invoke hooks
-        await asyncio.sleep(0.05)
+        # Pausa para permitir que o servidor processe e o hook escreva (síncrono)
+        await asyncio.sleep(0.05) 
 
-    # Allow some time for hook writes to complete
+    # 4. Finalizar e Assert
+    # Allow some time for hook writes to complete (embora sejam síncronas)
     await asyncio.sleep(0.2)
 
-    # Determine the expected NDJSON filename for today
+    # Determinar o ficheiro NDJSON esperado para hoje
     ymd_now = time.strftime("%Y%m%d", time.gmtime(time.time()))
     fname = outdir / f"telemetry-{ymd_now}.ndjson"
+    
     assert fname.exists(), f"Expected NDJSON file {fname} to exist"
 
-    # Read last lines and validate content
+    # Ler e validar o conteúdo
     text = fname.read_text(encoding="utf-8").strip()
     lines = [ln for ln in text.splitlines() if ln.strip()]
     assert len(lines) >= 3, f"Expected at least 3 persisted lines, found {len(lines)}"
 
-    # Parse last three lines and ensure rover_ids present
+    # Parse das últimas três linhas e garantir que todos os rovers estão presentes
     found_ids = set()
-    for ln in lines[-3:]:
-        obj = json.loads(ln)
-        found_ids.add(obj.get("rover_id"))
+    # Ler todas as linhas para garantir que não perdemos nenhum registro por causa da ordem
+    for ln in lines:
+        try:
+            obj = json.loads(ln)
+            found_ids.add(obj.get("rover_id"))
+        except json.JSONDecodeError as e:
+             pytest.fail(f"Failed to decode JSON line in persisted file: {ln}. Error: {e}")
+             
     for rid in rover_ids:
         assert rid in found_ids, f"Persisted file missing telemetry for rover {rid}"
 
