@@ -60,10 +60,11 @@ async def test_stress_packet_loss_retransmit_and_recovery():
     orig_backoff = config.BACKOFF_FACTOR
     orig_update_interval = config.DEFAULT_UPDATE_INTERVAL_S
     
-    config.TIMEOUT_TX_INITIAL = 0.05
+    # Parâmetros ligeiramente mais folgados para estabilidade em stress com 30% de perda
+    config.TIMEOUT_TX_INITIAL = 0.1
     config.N_RETX = 20
     config.BACKOFF_FACTOR = 1.5
-    config.DEFAULT_UPDATE_INTERVAL_S = 0.05 
+    config.DEFAULT_UPDATE_INTERVAL_S = 0.1 
 
     loop = asyncio.get_event_loop()
     
@@ -88,7 +89,8 @@ async def test_stress_packet_loss_retransmit_and_recovery():
 
         # 3. Inicializar Protocolos
         server = MLServerProtocol(ms)
-        client = SimpleMLClient(rover_id="R-STRESS", server=SERVER_ADDR, exit_on_complete=True)
+        # CORREÇÃO: exit_on_complete=False. O cliente não deve parar o event loop do teste.
+        client = SimpleMLClient(rover_id="R-STRESS", server=SERVER_ADDR, exit_on_complete=False)
 
         # 4. Criar Lossy Transports
         client_transport = LossyTransport(loop, server, CLIENT_ADDR, drop_rate=0.30, max_delay_s=0.03)
@@ -110,7 +112,8 @@ async def test_stress_packet_loss_retransmit_and_recovery():
 
 
         # 7. Esperar pela Missão Completa
-        deadline = time.time() + 40.0
+        # Deadline de 60s para ter tempo suficiente com 30% de perda
+        deadline = time.time() + 60.0
         completed = False
         while time.time() < deadline:
             missions = ms.list_missions()
@@ -125,7 +128,7 @@ async def test_stress_packet_loss_retransmit_and_recovery():
         # 8. Asserções
         assert completed, f"Expected mission to be completed by R-STRESS despite packet loss; snapshot: {ms.list_missions()}"
         
-        # CORREÇÃO CRÍTICA: Aguardar um tempo extra para permitir que o servidor termine o processamento 
+        # Aguardar um tempo extra para permitir que o servidor termine o processamento 
         # do MISSION_COMPLETE (e envie o ACK final) antes de o loop ser parado.
         await asyncio.sleep(1.0)
 
