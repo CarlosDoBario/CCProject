@@ -11,11 +11,18 @@ import pytest
 
 from common import binary_proto
 from nave_mae.telemetry_server import TelemetryServer
+# ADICIONADO: Importar Stores
+from nave_mae.mission_store import MissionStore
+from nave_mae.telemetry_store import TelemetryStore
 
 
 @pytest.mark.asyncio
 async def test_get_connected_rovers_adds_and_removes_on_disconnect():
-    srv = TelemetryServer(host="127.0.0.1", port=0, mission_store=None, telemetry_store=None)
+    # Inicializar Stores vazias para evitar que o TelemetryServer falhe
+    ms = MissionStore()
+    ts = TelemetryStore(mission_store=ms)
+
+    srv = TelemetryServer(host="127.0.0.1", port=0, mission_store=ms, telemetry_store=ts)
     await srv.start()
     try:
         sock = srv._server.sockets[0]
@@ -24,6 +31,7 @@ async def test_get_connected_rovers_adds_and_removes_on_disconnect():
         # helper to open a raw connection and send one telemetry frame for a given rover_id
         async def open_and_send(rover_id: str):
             reader, writer = await asyncio.open_connection(host, port)
+            # O TelemetryServer regista o rover assim que o primeiro payload é recebido.
             tlvs = [(binary_proto.TLV_PAYLOAD_JSON, b'{"hello": true}')]
             frame = binary_proto.pack_ts_message(binary_proto.TS_TELEMETRY, rover_id, tlvs, msgid=0)
             writer.write(frame)
@@ -36,7 +44,7 @@ async def test_get_connected_rovers_adds_and_removes_on_disconnect():
         reader1, writer1 = await open_and_send(r1)
         reader2, writer2 = await open_and_send(r2)
 
-        # wait until server registers both rovers
+        # 1. VERIFICAR REGISTO
         deadline = time.time() + 5.0
         while time.time() < deadline:
             conns = srv.get_connected_rovers()
@@ -50,28 +58,28 @@ async def test_get_connected_rovers_adds_and_removes_on_disconnect():
         conns = srv.get_connected_rovers()
         assert r1 in conns and r2 in conns
 
-        # Close first connection and ensure mapping removed
+        # 2. FECHAR 1ª CONEXÃO E VERIFICAR REMOÇÃO
         writer1.close()
         try:
             await writer1.wait_closed()
         except Exception:
-            # some asyncio implementations may raise on wait_closed; ignore
             pass
 
         deadline = time.time() + 5.0
         while time.time() < deadline:
             conns = srv.get_connected_rovers()
+            # Esperar até que R-ONE seja removido
             if r1 not in conns:
                 break
             await asyncio.sleep(0.05)
         else:
             pytest.fail(f"Rover {r1} mapping not removed after disconnect. Connected: {srv.get_connected_rovers()}")
 
-        # Ensure second still present
+        # Garantir que o segundo continua presente
         conns = srv.get_connected_rovers()
         assert r2 in conns
 
-        # Close second connection and verify removal
+        # 3. FECHAR 2ª CONEXÃO E VERIFICAR REMOÇÃO
         writer2.close()
         try:
             await writer2.wait_closed()
@@ -81,13 +89,14 @@ async def test_get_connected_rovers_adds_and_removes_on_disconnect():
         deadline = time.time() + 5.0
         while time.time() < deadline:
             conns = srv.get_connected_rovers()
+            # Esperar até que R-TWO seja removido
             if r2 not in conns:
                 break
             await asyncio.sleep(0.05)
         else:
             pytest.fail(f"Rover {r2} mapping not removed after disconnect. Connected: {srv.get_connected_rovers()}")
 
-        # finally empty list
+        # Finalmente, a lista de conectados deve estar vazia
         assert srv.get_connected_rovers() == []
 
     finally:
