@@ -1,14 +1,8 @@
 #!/usr/bin/env python3
 """
-tests/test_cli_end_to_end.py
-
 End-to-end test for the telemetry client CLI.
-
-This test:
- - starts an in-process TelemetryServer (TelemetryServer + TelemetryStore + MissionStore)
- - launches the CLI script src/rover/telemetry_client.py as a subprocess with PYTHONPATH=src
- - waits until the server registers the rover id
- - terminates the CLI subprocess and stops the server
+This test starts an in-process TelemetryServer and launches the CLI script 
+src/rover/telemetry_client.py as a subprocess.
 """
 import asyncio
 import os
@@ -22,7 +16,6 @@ from common import binary_proto
 from nave_mae.telemetry_server import TelemetryServer
 from nave_mae.telemetry_store import TelemetryStore
 from nave_mae.mission_store import MissionStore
-from nave_mae.telemetry_hooks import register_telemetry_hooks
 
 
 def _get_free_port():
@@ -42,25 +35,34 @@ async def test_cli_end_to_end_registers_with_server(tmp_path):
     port = _get_free_port()
     rover_id = "R-CLI-E2E"
 
-    # start server and stores
+    # 1. Iniciar Stores
     ms = MissionStore()
-    ts = TelemetryStore(history_size=10)
-    register_telemetry_hooks(ms, ts)
+    # CORREÇÃO ANTERIOR MANTIDA: TelemetryStore não aceita history_size
+    ts = TelemetryStore(mission_store=ms) 
 
+    # 2. Iniciar Telemetry Server
     srv = TelemetryServer(mission_store=ms, telemetry_store=ts, host=host, port=port)
     await srv.start()
 
-    # locate the CLI script path relative to repository root
+    # 3. Localizar o Script CLI
     repo_root = Path(__file__).resolve().parents[2]
     script_path = repo_root / "src" / "rover" / "telemetry_client.py"
     assert script_path.exists(), f"telemetry_client.py not found at {script_path}"
 
     # Prepare environment for subprocess so that 'src' is on PYTHONPATH
     env = os.environ.copy()
-    env["PYTHONPATH"] = str(repo_root / "src")
+    
+    # CORREÇÃO FINAL: Usa os.pathsep (';' no Windows)
+    new_path = str(repo_root / "src") 
+    existing_path = env.get("PYTHONPATH", "")
+    
+    if existing_path:
+        env["PYTHONPATH"] = new_path + os.pathsep + existing_path
+    else:
+        env["PYTHONPATH"] = new_path
 
-    # Launch CLI subprocess (persistent mode). Use a short interval for quick registration.
-    # IMPORTANT: pass --host and --port so the CLI connects to our test server port.
+
+    # 4. Iniciar Subprocesso CLI
     proc = await asyncio.create_subprocess_exec(
         sys.executable,
         str(script_path),
@@ -78,34 +80,36 @@ async def test_cli_end_to_end_registers_with_server(tmp_path):
     )
 
     try:
-        # Wait until server registers the rover (give some generous timeout)
+        # 5. Esperar pelo Registo do Rover no Servidor (Max 10.0s)
         deadline = time.time() + 10.0
         while time.time() < deadline:
             if rover_id in srv.get_connected_rovers():
                 break
             await asyncio.sleep(0.05)
         else:
-            # If it didn't register, capture subprocess output for debugging
-            stderr = await proc.stderr.read()
-            stdout = await proc.stdout.read()
-            stderr_text = stderr.decode(errors="replace") if stderr else "<no stderr>"
-            stdout_text = stdout.decode(errors="replace") if stdout else "<no stdout>"
+            # Se falhar, captura o output do subprocesso para debug
+            stderr_bytes = await asyncio.wait_for(proc.stderr.read(), timeout=5.0) 
+            stdout_bytes = await asyncio.wait_for(proc.stdout.read(), timeout=5.0)
+            
+            stderr_text = stderr_bytes.decode(errors="replace") if stderr_bytes else "<no stderr>"
+            stdout_text = stdout_bytes.decode(errors="replace") if stdout_bytes else "<no stdout>"
+
             pytest.fail(
                 f"CLI subprocess did not register rover {rover_id} within timeout. "
                 f"Connected: {srv.get_connected_rovers()}\n"
                 f"subprocess stdout:\n{stdout_text}\nsubprocess stderr:\n{stderr_text}"
             )
 
-        # Success: the CLI process connected and the server saw the rover.
+        # 6. Sucesso
         assert rover_id in srv.get_connected_rovers()
 
     finally:
-        # Terminate CLI subprocess cleanly
+        # 7. Limpeza (Kill Process e Stop Server)
         try:
             proc.terminate()
         except ProcessLookupError:
             pass
-        # wait for it to exit, otherwise kill
+        # espera que termine
         try:
             await asyncio.wait_for(proc.wait(), timeout=3.0)
         except asyncio.TimeoutError:
