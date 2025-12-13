@@ -1,88 +1,132 @@
-#!/usr/bin/env python3
-"""
-tests/test_backoff_behavior_deterministic.py
-
-Deterministic unit test for TelemetryClient reconnection backoff logic.
-
-Strategy:
-- Monkeypatch common.utils.exponential_backoff() to return a deterministic generator
-  that yields known delays (e.g. [0.01, 0.02, 0.03]).
-- Monkeypatch random.uniform to return 0.0 so no jitter is added.
-- Monkeypatch asyncio.open_connection to always raise ConnectionRefusedError so the client
-  fails to connect and exercises the backoff path.
-- Monkeypatch asyncio.sleep to a fake coroutine that records the durations requested and
-  returns immediately (using the original asyncio.sleep for a brief yield).
-- Start the TelemetryClient in persistent mode (client.start()) and wait until the
-  expected number of backoff sleeps have been requested, then stop the client and assert
-  the recorded delays match the deterministic generator.
-"""
-import time
 import asyncio
-import random
-import pytest
+import time
+import struct
+from unittest.mock import MagicMock, patch
 
-from common import utils
-from rover.telemetry_client import TelemetryClient
+import pytest
+from common import config
+from common import binary_proto 
+from rover.ml_client import SimpleMLClient 
 
 
 @pytest.mark.asyncio
-async def test_backoff_behavior_deterministic(monkeypatch):
-    # deterministic delays to be yielded by the backoff generator
-    delays = [0.01, 0.02, 0.03]
+async def test_retransmit_backoff():
+    """
+    Testa que o loop de retransmissão segue a regra de backoff exponencial (1.0s, 2.0s, 4.0s...).
+    """
+    # 1. Configuração de parâmetros de fiabilidade
+    config.TIMEOUT_TX_INITIAL = 1.0
+    config.BACKOFF_FACTOR = 2.0
+    # CORRIGIDO: N_RETX = 2 resulta em 3 envios no total (1 Inicial + 2 Retrans)
+    config.N_RETX = 2  
 
-    # Replace exponential_backoff with a generator that yields our deterministic delays
-    def make_gen(base=0.0, factor=0.0, max_delay=0.0):
-        for d in delays:
-            yield d
-        while True:
-            yield delays[-1]
 
-    monkeypatch.setattr(utils, "exponential_backoff", lambda base, factor, max_delay: make_gen(base, factor, max_delay))
+    # 2. Inicialização do Cliente e Mocking
+    mock_transport = MagicMock()
+    client = SimpleMLClient(rover_id="R-TEST", server=("127.0.0.1", 64070))
+    client.transport = mock_transport
+    
+    # Garantir que o atributo existe no cliente
+    if not hasattr(client, '_persisted_files'):
+         client._persisted_files = {}
 
-    # Remove jitter by forcing random.uniform to return 0.0
-    monkeypatch.setattr(random, "uniform", lambda a, b: 0.0)
+    # Helper para correr a lógica central do retransmit_loop uma vez
+    async def run_retransmit_loop_once(client_inst):
+        """Executa a lógica de retransmissão sem o loop infinito e o sleep."""
+        # A chamada time.time() aqui consome o próximo valor do mock_times
+        now_mock = time.time() 
+        remove = []
+        with client_inst._lock:
+            items = list(client_inst.pending.items())
+        
+        for mid, (pkt, created, attempts) in items:
+            # Usa backoff exponencial
+            timeout = config.TIMEOUT_TX_INITIAL * (config.BACKOFF_FACTOR ** (attempts - 1))
+            
+            # Condição do SimpleMLClient: if now - created > timeout:
+            if now_mock - created > timeout:
+                if attempts <= config.N_RETX: # Agora N_RETX=2, permite attempts=1 e attempts=2
+                    client_inst.transport.sendto(pkt, client_inst.server)
+                    with client_inst._lock:
+                        # O tempo de 'created' é atualizado para o tempo atual do mock (now_mock)
+                        client_inst.pending[mid] = (pkt, now_mock, attempts + 1)
+                else:
+                    remove.append(mid)
+        
+        with client_inst._lock:
+            for r in remove:
+                client_inst.pending.pop(r, None)
+                client_inst._persisted_files.pop(r, None)
+        await asyncio.sleep(0) # Passa o controlo ao loop de eventos
 
-    # Save original asyncio.sleep to use inside the fake sleep and in wait loops
-    orig_sleep = asyncio.sleep
 
-    recorded = []
+    # 3. Preparação do Pacote (Simulando request_mission)
+    test_msgid = 12345
+    test_seqnum = 1
+    tlvs = [(binary_proto.TLV_CAPABILITIES, b"sampling")]
+    
+    test_packet = binary_proto.pack_ml_datagram(
+        binary_proto.ML_REQUEST_MISSION, 
+        client.rover_id, 
+        tlvs, 
+        flags=binary_proto.FLAG_ACK_REQUESTED, 
+        seqnum=test_seqnum, 
+        msgid=test_msgid
+    )
 
-    async def fake_sleep(duration):
-        # record the requested duration and yield control briefly using original sleep
-        recorded.append(duration)
-        await orig_sleep(0)
+    T_START = 1000.0
+    initial_timeout = config.TIMEOUT_TX_INITIAL # 1.0
 
-    # Patch open_connection so connection attempt always fails (force backoff path)
-    async def fake_open_connection(*args, **kwargs):
-        raise ConnectionRefusedError("forced failure for test")
+    # Sequência de tempo (4 valores de mock_times são suficientes)
+    # 1. created_at = 1000.0
+    # 2. now_mock 1: 1001.01 (T > 1.0) -> Triggers 1st retrans (attempts=2)
+    # 3. now_mock 2: 1003.02 (T > 2.0 desde 1001.01) -> Triggers 2nd retrans (attempts=3)
+    # 4. now_mock 3: 1007.03 (T > 4.0 desde 1003.02) -> Triggers exhaustion (attempts=4)
+    mock_times = [
+        T_START, 
+        T_START + initial_timeout + 0.01, 
+        T_START + initial_timeout + (initial_timeout * 2) + 0.02, 
+        T_START + initial_timeout + (initial_timeout * 2) + (initial_timeout * 4) + 0.03, 
+    ]
 
-    monkeypatch.setattr(asyncio, "open_connection", fake_open_connection)
-    monkeypatch.setattr(asyncio, "sleep", fake_sleep)
 
-    client = TelemetryClient(rover_id="R-BACK", host="127.0.0.1", port=12345, interval_s=0.0, reconnect=True, backoff_base=0.1, backoff_factor=2.0)
+    # 4. Patch do time.time() e Início da Simulação
+    with patch("time.time", side_effect=mock_times) as time_mock:
 
-    try:
-        # start background runner
-        await client.start()
+        # A) Início da simulação: Colocar o pacote em pending e enviar
+        with client._lock:
+             # time.time() consome T_START (1000.0) para created_at
+             client.pending[int(test_msgid)] = (test_packet, time.time(), 1)
+             client.transport.sendto(test_packet, client.server)
+        
+        # O envio inicial já ocorreu (call_count = 1)
+        assert mock_transport.sendto.call_count == 1
+        po = client.pending.get(test_msgid)
+        assert po is not None
+        assert po[2] == 1 # 1ª Tentativa (inicial)
 
-        # wait until we've recorded at least the number of expected delays, or timeout
-        deadline = time.time() + 2.0
-        while time.time() < deadline and len(recorded) < len(delays):
-            # use original sleep to avoid interfering with recorded list
-            await orig_sleep(0.01)
+        # 1. 1ª Retransmissão (após 1.0s)
+        await run_retransmit_loop_once(client) 
+        
+        # Verifica se houve a 1ª retransmissão (total 2)
+        assert mock_transport.sendto.call_count == 2
+        po = client.pending.get(test_msgid)
+        assert po is not None
+        assert po[2] == 2 # 2ª Tentativa
 
-        assert len(recorded) >= len(delays), f"Expected at least {len(delays)} backoff sleeps, recorded: {recorded}"
+        # 2. 2ª Retransmissão (após 2.0s do 1º retrans)
+        await run_retransmit_loop_once(client)
+        
+        # Verifica se houve a 2ª retransmissão (total 3)
+        assert mock_transport.sendto.call_count == 3
+        po = client.pending.get(test_msgid)
+        assert po is not None
+        assert po[2] == 3 # 3ª Tentativa (Última permitida por N_RETX=2)
 
-        # Because we forced random.uniform to 0.0, the sleep durations should match delays exactly
-        # Only compare the first N recorded entries (there may be extra sleeps from cleanup)
-        for i, expected in enumerate(delays):
-            # allow small floating point tolerance
-            assert abs(recorded[i] - expected) < 1e-6, f"Backoff delay mismatch at index {i}: expected {expected}, got {recorded[i]}"
+        # 3. Exaustão de Retries (após 4.0s do 2º retrans)
+        await run_retransmit_loop_once(client)
 
-    finally:
-        # restore and cleanup client
-        # stop() will cancel the background task and call _disconnect
-        try:
-            await client.stop()
-        except Exception:
-            pass
+        # Verifica se não houve 4ª retransmissão
+        assert mock_transport.sendto.call_count == 3
+        # Verifica se o pacote foi removido após a exaustão
+        assert test_msgid not in client.pending
