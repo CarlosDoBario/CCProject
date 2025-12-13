@@ -1,22 +1,3 @@
-#!/usr/bin/env python3
-"""
-binary_proto.py
-
-Binary TLV protocol helpers for TelemetryStream (TS) and MissionLink (ML).
-
-Design summary (short):
-- All numeric fields use big-endian (network order).
-- TS (TCP) framing: 4-byte BE length prefix followed by payload.
-- ML (UDP) framing: whole datagram is a message; CRC32 trailer mandatory.
-- Header and TLV scheme as described in docs/BINARY_PROTOCOL_SPEC.md
-- TLV: type (uint8), length (uint16 BE), value (length bytes).
-
-This module provides:
-- enums/constants for message types and TLV types
-- pack/unpack helpers for headers and TLVs
-- parsing functions that return canonical dicts to be used by servers
-- pack helpers for common messages (telemetry, login, request_mission, progress)
-"""
 from __future__ import annotations
 
 import struct
@@ -24,13 +5,10 @@ import time
 import zlib
 from typing import Dict, Tuple, List, Any, Optional
 
-# -------------------------
-# Constants / enums
-# -------------------------
-# General
+
 VERSION = 1
 
-# TS (TCP) MsgType
+# TS 
 TS_LOGIN = 1
 TS_TELEMETRY = 2
 TS_HEARTBEAT = 3
@@ -38,7 +16,7 @@ TS_ACK = 4
 TS_ERROR = 5
 TS_LOGOUT = 6
 
-# ML (UDP) MsgType
+# ML 
 ML_REQUEST_MISSION = 1
 ML_MISSION_ASSIGN = 2
 ML_PROGRESS = 3
@@ -48,11 +26,11 @@ ML_ERROR = 6
 ML_HEARTBEAT = 7
 ML_CANCEL = 8
 
-# Flags bits
+# Flags 
 FLAG_ACK_REQUESTED = 0x01
 FLAG_CRC32 = 0x02
 
-# TLV types (common)
+# TLV 
 TLV_MISSION_ID = 0x01
 TLV_POSITION = 0x02
 TLV_BATTERY = 0x03
@@ -61,18 +39,16 @@ TLV_MOTION = 0x05
 TLV_PROGRESS = 0x06
 TLV_STATUS = 0x07
 TLV_ERRORS = 0x08
-TLV_PAYLOAD_JSON = 0x09  # fallback (string)
-# ML-specific
+TLV_PAYLOAD_JSON = 0x09  
+# So do ML
 TLV_MISSION_SPEC = 0x11
 TLV_AREA = 0x12
 TLV_TASK = 0x13
 TLV_PARAMS_JSON = 0x14
-# ACK metadata
 TLV_ACKED_MSG_ID = 0x20
-# Capabilities
 TLV_CAPABILITIES = 0x30
 
-# Status enum mapping (example)
+# Status enum 
 STATUS_ENUM = {
     0: "UNKNOWN",
     1: "IDLE",
@@ -83,20 +59,16 @@ STATUS_ENUM = {
 }
 STATUS_INV = {v: k for k, v in STATUS_ENUM.items()}
 
-# -------------------------
-# Low-level helpers
-# -------------------------
+
 def now_ms() -> int:
     return int(time.time() * 1000)
 
 
 def epoch_ms_to_iso(ms: int) -> str:
-    # simple ISO without timezone offset (UTC)
     return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(ms / 1000.0))
 
-
+#Pouco Usado
 def iso_to_epoch_ms(s: str) -> int:
-    # Not used heavily here; server expects ms from clients
     import datetime
     dt = datetime.datetime.fromisoformat(s.replace("Z", "+00:00"))
     return int(dt.timestamp() * 1000)
@@ -106,16 +78,13 @@ def crc32_be(data: bytes) -> int:
     return zlib.crc32(data) & 0xFFFFFFFF
 
 
-# -------------------------
 # TLV pack/unpack
-# -------------------------
+
 def pack_tlv(t: int, value: bytes) -> bytes:
-    # type (uint8) + length (uint16 BE) + value
     return struct.pack(">BH", t, len(value)) + value
 
 
 def unpack_tlvs(data: bytes) -> List[Tuple[int, bytes]]:
-    """Return list of (type, value) tuples parsed from data. Raises ValueError if truncated."""
     pos = 0
     out = []
     n = len(data)
@@ -129,14 +98,14 @@ def unpack_tlvs(data: bytes) -> List[Tuple[int, bytes]]:
         out.append((t, val))
         pos += length
     if pos != n:
-        # trailing bytes leftover - treat as error
+        # Tratamento de erro para bytes extra
         raise ValueError("Extra bytes after TLV parsing")
     return out
 
 
-# -------------------------
+
 # Header pack/unpack
-# -------------------------
+
 # TS header: version(1) | msgtype(1) | flags(1) | reserved(1) | msgid(8) | timestamp_ms(8)
 TS_HEADER_FMT = ">BBBBQQ"
 TS_HEADER_SIZE = struct.calcsize(TS_HEADER_FMT)  # 1+1+1+1+8+8 = 20
@@ -155,9 +124,7 @@ def unpack_ts_header(buf: bytes) -> Dict[str, Any]:
 
 # ML header: version(1) | msgtype(1) | flags(1) | seqnum(4) | msgid(8) | timestamp_ms(8)
 ML_HEADER_FMT = ">BBB I Q Q"
-# note: space for readability in format not necessary; use same calc
 ML_HEADER_FMT = ">BBBIQQ"
-# Calc size
 ML_HEADER_SIZE = 1 + 1 + 1 + 4 + 8 + 8  # 23
 
 def pack_ml_header(msgtype: int, flags: int, seqnum: int = 0, msgid: int = 0, timestamp_ms: Optional[int] = None) -> bytes:
@@ -177,16 +144,16 @@ def unpack_ml_header(buf: bytes) -> Dict[str, Any]:
     return {"version": version, "msgtype": msgtype, "flags": flags, "seqnum": seqnum, "msgid": msgid, "timestamp_ms": ts_ms, "header_size": ML_HEADER_SIZE}
 
 
-# -------------------------
+
 # High-level packers
-# -------------------------
+
 def pack_ts_message(msgtype: int, rover_id: str, tlv_items: List[Tuple[int, bytes]], flags: int = 0, msgid: int = 0, timestamp_ms: Optional[int] = None, include_crc: bool = False) -> bytes:
     """
-    Return full framed TS message ready to send on TCP:
+    Devolve a mensagem pronta para enviar por TCP
       4-byte BE length | payload
     Payload = header + roverid + tlvs [+ crc32 if include_crc or flags has CRC bit]
     """
-    # Ensure header flags reflect include_crc request
+
     if include_crc:
         flags = flags | FLAG_CRC32
 
@@ -198,11 +165,10 @@ def pack_ts_message(msgtype: int, rover_id: str, tlv_items: List[Tuple[int, byte
     body = header + rover_field
     for t, v in tlv_items:
         body += pack_tlv(t, v)
-    # CRC if requested
+    # CRC caso seja pedido
     if include_crc or (flags & FLAG_CRC32):
         crc = crc32_be(body)
         body += struct.pack(">I", crc)
-    # prepend length
     L = len(body)
     frame = struct.pack(">I", L) + body
     return frame
@@ -210,7 +176,7 @@ def pack_ts_message(msgtype: int, rover_id: str, tlv_items: List[Tuple[int, byte
 
 def pack_ml_datagram(msgtype: int, rover_id: str, tlv_items: List[Tuple[int, bytes]], flags: int = 0, seqnum: int = 0, msgid: int = 0, timestamp_ms: Optional[int] = None) -> bytes:
     """
-    Return ML datagram bytes: header + roverid + tlvs + CRC32 (mandatory)
+    Devolve a mensagem ML : header + roverid + tlvs + CRC32
     """
     header = pack_ml_header(msgtype, flags, seqnum=seqnum, msgid=msgid, timestamp_ms=timestamp_ms)
     rid_b = rover_id.encode("utf-8")
@@ -226,21 +192,16 @@ def pack_ml_datagram(msgtype: int, rover_id: str, tlv_items: List[Tuple[int, byt
     return body
 
 
-# -------------------------
 # High-level unpackers -> canonical dict
-# -------------------------
+
 def parse_ts_payload(payload: bytes) -> Dict[str, Any]:
     """
-    Parse TS payload (no 4-byte length). Verify CRC if flags indicate it.
-    Returns dict with keys: header, rover_id, tlvs (dict mapping type->list of bytes)
-
-    Notes:
-    - validates that when FLAG_CRC32 is set the payload includes the 4-byte CRC trailer.
-    - raises ValueError on malformed payload (truncated header/rover id/CRC/TLVs).
+    Parse TS payload (sem 4-byte length).
+    Devolve: header, rover_id, tlvs (dict mapping type->list of bytes)
     """
     if len(payload) < TS_HEADER_SIZE + 1:
         raise ValueError("TS payload too short")
-    # unpack header first (may be used to determine whether CRC is present)
+    # Primerio o header
     header = unpack_ts_header(payload[:TS_HEADER_SIZE])
     pos = TS_HEADER_SIZE
     # RoverID
@@ -252,7 +213,7 @@ def parse_ts_payload(payload: bytes) -> Dict[str, Any]:
         raise ValueError("TS rover id truncated")
     rover_id = payload[pos:pos + rid_len].decode("utf-8")
     pos += rid_len
-    # If CRC flag set, ensure we have at least 4 bytes for CRC trailer
+    # Se a flag CRC estiver setada, verificar se há o espaço necessario
     has_crc = bool(header["flags"] & FLAG_CRC32)
     if has_crc:
         if len(payload) < pos + 4:
@@ -261,12 +222,12 @@ def parse_ts_payload(payload: bytes) -> Dict[str, Any]:
     if end_crc_pos < pos:
         raise ValueError("TS payload malformed: CRC position before TLV block")
     tlv_block = payload[pos:end_crc_pos]
-    # parse TLVs (this will raise ValueError on truncated/extra bytes)
+    # parse TLVs 
     tlv_list = unpack_tlvs(tlv_block)
     tlv_map: Dict[int, List[bytes]] = {}
     for t, v in tlv_list:
         tlv_map.setdefault(t, []).append(v)
-    # verify CRC if present
+    # verificar CRC
     if has_crc:
         corpayload = payload[:end_crc_pos]
         crc_expected = struct.unpack(">I", payload[end_crc_pos: end_crc_pos + 4])[0]
@@ -277,11 +238,10 @@ def parse_ts_payload(payload: bytes) -> Dict[str, Any]:
 
 def parse_ml_datagram(datagram: bytes) -> Dict[str, Any]:
     """
-    Parse an ML datagram. Verify CRC32 trailer and return canonical structure.
+    Parse an ML datagram. Verify CRC32 
     """
     if len(datagram) < ML_HEADER_SIZE + 1 + 4:  # header + min roverid + crc
         raise ValueError("ML datagram too short")
-    # verify CRC trailer
     if len(datagram) < 4:
         raise ValueError("datagram too small for crc")
     crc_expected = struct.unpack(">I", datagram[-4:])[0]
@@ -304,22 +264,9 @@ def parse_ml_datagram(datagram: bytes) -> Dict[str, Any]:
     return {"header": header, "rover_id": rover_id, "tlvs": tlv_map}
 
 
-# -------------------------
-# TLV decode helpers to canonical fields
-# -------------------------
-def tlv_to_canonical(tlv_map: Dict[int, List[bytes]]) -> Dict[str, Any]:
-    """
-    Convert TLV map into a canonical python dict for MissionStore/TelemetryStore consumption.
-    Priority: use typed TLVs. If complex fields required, fallback to PAYLOAD_JSON TLV (0x09).
 
-    Behavior:
-      - Typed TLVs (position, battery, progress, status, motion, temperature) take precedence.
-      - PAYLOAD_JSON and PARAMS_JSON are parsed if possible; dicts are merged into the result
-        but do NOT override already-populated typed fields.
-      - Multiple TLV_ERRORS entries produce a list of error strings/objects.
-      - TLV_ACKED_MSG_ID is exposed as numeric _acked_msg_id when present (useful for ACK handling).
-      - TLV_CAPABILITIES is parsed into a list of capability strings.
-    """
+# TLV decode, auxiliar 
+def tlv_to_canonical(tlv_map: Dict[int, List[bytes]]) -> Dict[str, Any]:
     out: Dict[str, Any] = {}
 
     def _safe_json_load(b: bytes) -> Any:
@@ -336,7 +283,7 @@ def tlv_to_canonical(tlv_map: Dict[int, List[bytes]]) -> Dict[str, Any]:
         except Exception:
             out["mission_id"] = tlv_map[TLV_MISSION_ID][0].decode("latin-1", errors="ignore")
 
-    # position (first occurrence)
+    # posição 
     if TLV_POSITION in tlv_map:
         v = tlv_map[TLV_POSITION][0]
         if len(v) >= 12:
@@ -391,7 +338,7 @@ def tlv_to_canonical(tlv_map: Dict[int, List[bytes]]) -> Dict[str, Any]:
         except Exception:
             pass
 
-    # errors: can be multiple TLV_ERRORS entries; try JSON decode else string
+    # errors:
     if TLV_ERRORS in tlv_map:
         errs = []
         for b in tlv_map[TLV_ERRORS]:
@@ -411,7 +358,7 @@ def tlv_to_canonical(tlv_map: Dict[int, List[bytes]]) -> Dict[str, Any]:
                     errs.append(str(b))
         out["errors"] = errs
 
-    # capabilities: may be one TLV with CSV or multiple entries
+    # capacidade
     if TLV_CAPABILITIES in tlv_map:
         caps = []
         for b in tlv_map[TLV_CAPABILITIES]:
@@ -433,7 +380,7 @@ def tlv_to_canonical(tlv_map: Dict[int, List[bytes]]) -> Dict[str, Any]:
                     caps_filtered.append(c)
             out["capabilities"] = caps_filtered
 
-    # TLV_ACKED_MSG_ID: expose numeric ack id for canonical representation of ACK frames
+    # TLV_ACKED_MSG_ID: expoe o ID da mensagem
     if TLV_ACKED_MSG_ID in tlv_map:
         try:
             b = tlv_map[TLV_ACKED_MSG_ID][0]
@@ -443,13 +390,12 @@ def tlv_to_canonical(tlv_map: Dict[int, List[bytes]]) -> Dict[str, Any]:
         except Exception:
             pass
 
-    # params JSON (mission params or telemetry params)
+    # params JSON (parametros da Missao ou da telemetria)
     if TLV_PARAMS_JSON in tlv_map:
         try:
             parsed = _safe_json_load(tlv_map[TLV_PARAMS_JSON][0])
             if parsed is not None:
                 out["params"] = parsed
-                # CORREÇÃO: Mesclar campos para o nível superior do canonical (Temp/Speed/Status)
                 if isinstance(parsed, dict):
                     for k, v in parsed.items():
                         # Só adiciona se o campo ainda não tiver sido set por um TLV dedicado
@@ -460,7 +406,6 @@ def tlv_to_canonical(tlv_map: Dict[int, List[bytes]]) -> Dict[str, Any]:
         except Exception:
             out["params_json"] = tlv_map[TLV_PARAMS_JSON][0].decode("utf-8", errors="replace")
 
-    # mission spec (string blob or JSON)
     if TLV_MISSION_SPEC in tlv_map:
         try:
             mspec_b = tlv_map[TLV_MISSION_SPEC][0]
@@ -472,14 +417,11 @@ def tlv_to_canonical(tlv_map: Dict[int, List[bytes]]) -> Dict[str, Any]:
         except Exception:
             out["mission_spec"] = tlv_map[TLV_MISSION_SPEC][0].decode("utf-8", errors="ignore")
 
-    # payload JSON fallback: combine occurrences. Merge dicts into out for convenience,
-    # but do not override already-set typed fields (typed take precedence).
     if TLV_PAYLOAD_JSON in tlv_map:
         payload_vals = []
         for b in tlv_map[TLV_PAYLOAD_JSON]:
             parsed = _safe_json_load(b)
             if parsed is None:
-                # keep raw string as fallback
                 try:
                     s = b.decode("utf-8")
                 except Exception:
@@ -487,20 +429,17 @@ def tlv_to_canonical(tlv_map: Dict[int, List[bytes]]) -> Dict[str, Any]:
                 payload_vals.append(s)
             else:
                 payload_vals.append(parsed)
-                # If parsed is a dict, merge unknown keys (do not override typed keys)
                 if isinstance(parsed, dict):
                     for k, v in parsed.items():
                         if k not in out:
                             out[k] = v
-        # store the raw/parsed payloads in payload_json for completeness
         out.setdefault("payload_json", payload_vals[0] if len(payload_vals) == 1 else payload_vals)
 
     return out
 
 
-# -------------------------
 # Convenience packers for common typed TLVs
-# -------------------------
+
 def tlv_position(x: float, y: float, z: float = 0.0) -> Tuple[int, bytes]:
     return TLV_POSITION, struct.pack(">fff", float(x), float(y), float(z))
 

@@ -1,17 +1,3 @@
-#!/usr/bin/env python3
-"""
-utils.py
-Utilitários comuns para o projecto MissionLink (ML) e TelemetryStream (TS).
-
-Contém:
-- configuração de logging consistente (texto legível; fácil trocar para JSON).
-- helpers para backoff exponencial.
-- helpers para timestamps (ISO8601 UTC e epoch ms).
-- small in-memory metrics counters (opcional, simples).
-- função safe_sleep com jitter para evitar sincronização.
-- utilitários de depuração para dados binários (hexdump) e geração de ids.
-"""
-
 from __future__ import annotations
 
 import time
@@ -25,7 +11,6 @@ from typing import Dict, Any, Optional, Iterator
 
 from common import config
 
-# --- Logging setup ----------------------------------------------------------
 def get_logger(name: str = "ml") -> logging.Logger:
     """
     Retorna um logger configurado com nível a partir de config.LOG_LEVEL.
@@ -34,8 +19,7 @@ def get_logger(name: str = "ml") -> logging.Logger:
     """
     logger = logging.getLogger(name)
 
-    # Normalize name: allow callers to call get_logger many vezes without duplicating handlers
-    # Remove existing handlers to avoid duplicate output if modules are reloaded.
+    # Remove os handlers ja existentes para evitar duplicação
     if logger.handlers:
         for h in list(logger.handlers):
             try:
@@ -46,7 +30,7 @@ def get_logger(name: str = "ml") -> logging.Logger:
     level = getattr(logging, config.LOG_LEVEL.upper(), logging.INFO)
     logger.setLevel(level)
 
-    # Create handler explicitly bound to stdout to keep all logs on same stream
+    # Cria e adiciona um StreamHandler
     handler = logging.StreamHandler(stream=sys.stdout)
     fmt = "%(asctime)s %(levelname)s [%(name)s] %(message)s"
     handler.setFormatter(logging.Formatter(fmt))
@@ -55,38 +39,35 @@ def get_logger(name: str = "ml") -> logging.Logger:
     logger.addHandler(handler)
     logger.propagate = False
 
-    # Route warnings (from the warnings module) to logging
+
     logging.captureWarnings(True)
 
     return logger
 
 
-# --- Time helpers ----------------------------------------------------------
 def now_iso() -> str:
     """Timestamp atual em ISO8601 UTC (segundos de precisão)."""
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
 def now_ms() -> int:
-    """Timestamp atual em epoch milliseconds (alias mais curto)."""
+    """Timestamp atual em epoch milliseconds."""
     return int(time.time() * 1000)
 
 
 def now_epoch_ms() -> int:
-    """Backward-compatible name: Timestamp atual em epoch milliseconds."""
     return now_ms()
 
 
 def iso_to_epoch_ms(iso_ts: str) -> int:
-    """Converte ISO8601 UTC para epoch milliseconds. Levanta ValueError se inválido."""
+    """Converte ISO8601 UTC para epoch milliseconds. ValueError se inválido."""
     dt = datetime.fromisoformat(iso_ts)
-    # If naive, assume UTC
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
     return int(dt.timestamp() * 1000)
 
 
-# --- Backoff / sleep helpers ----------------------------------------------
+# --- Backoff / sleep helpers
 def exponential_backoff(base: float = 1.0, factor: float = 2.0, max_delay: float = 60.0) -> Iterator[float]:
     """
     Gerador infinito de delays: base, base*factor, base*factor^2, ... até max_delay.
@@ -112,13 +93,8 @@ def safe_sleep(seconds: float, jitter: float = 0.0) -> None:
     time.sleep(to_sleep)
 
 
-# --- Simple metrics --------------------------------------------------------
 class SimpleMetrics:
-    """
-    Contador muito simples para métricas em memória.
-    Não é persistente nem thread-safe por design simples; se precisares de concorrência,
-    proteger com locks ou usar uma biblioteca de metrics.
-    """
+
     def __init__(self) -> None:
         self.counters: Dict[str, int] = {}
         self.gauges: Dict[str, float] = {}
@@ -136,11 +112,10 @@ class SimpleMetrics:
         return {"counters": dict(self.counters), "gauges": dict(self.gauges)}
 
 
-# --- Utility helpers ------------------------------------------------------
+
 def pretty_json(obj: Any) -> str:
     """
-    Retorna JSON prettified (útil para logs de debug).
-    Mantém esta função para debug/admin mesmo com transporte binário.
+    Retorna JSON prettified (útil para logs de debug)
     """
     try:
         return json.dumps(obj, indent=2, ensure_ascii=False)
@@ -149,14 +124,13 @@ def pretty_json(obj: Any) -> str:
 
 
 def gen_msg_id() -> str:
-    """Gera um identificador simples para mensagens (UUID4 string)."""
+    """Gera um identificador simples para mensagens """
     return str(uuid.uuid4())
 
 
 def pretty_bytes(b: Optional[bytes], max_len: int = 128) -> str:
     """
     Retorna uma representação hex legível dos bytes (limitada).
-    Útil para logging de payloads binários sem imprimir blobs enormes.
     """
     if b is None:
         return "<None>"
@@ -174,6 +148,5 @@ def pretty_bytes(b: Optional[bytes], max_len: int = 128) -> str:
     return hex_s
 
 
-# --- Module-level globals -------------------------------------------------
 logger = get_logger("ml.utils")
 metrics = SimpleMetrics()

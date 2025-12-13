@@ -1,19 +1,3 @@
-#!/usr/bin/env python3
-"""
-mission_schema.py
-
-Validação e (de/para) serialização de mission_spec para uso em MissionLink (ML).
-
-Este módulo continua a validar a estrutura das mission_spec (mesmo sem JSON em
-transporte, as missões são objetos Python internos). Adiciona helpers para:
- - normalizar a mission_spec (area normalizada, campos por defeito)
- - converter mission_spec -> lista de TLVs (usada para construir MISSION_ASSIGN)
- - converter TLV map (como devolvido por binary_proto.parse_ml_datagram) -> mission_spec
-
-Desta forma mantemos a validação semântica, e fornecemos integração directa com o
-formato binário TLV definido em common/binary_proto.py.
-"""
-
 from typing import Dict, Any, Tuple, List, Optional
 import json
 import struct
@@ -51,7 +35,7 @@ def _validate_capture_images(params: Dict[str, Any]) -> List[str]:
 
 def _validate_collect_samples(params: Dict[str, Any]) -> List[str]:
     errs: List[str] = []
-    # accept either sample_count or depth_mm+sample_count
+    
     if "sample_count" not in params:
         errs.append("collect_samples: missing 'sample_count'")
     else:
@@ -90,7 +74,7 @@ def _validate_env_analysis(params: Dict[str, Any]) -> List[str]:
 
 def _normalize_area(area: Optional[Dict[str, Any]]) -> Optional[Dict[str, float]]:
     """
-    Normalize the area shape: ensure x1,y1,z1,x2,y2,z2 floats and order coordinates.
+    Normaliza a area definida por x1,y1,x2,y2,z1,z2.
     """
     if area is None:
         return None
@@ -114,14 +98,6 @@ def _normalize_area(area: Optional[Dict[str, Any]]) -> Optional[Dict[str, float]
 
 
 def validate_mission_spec(mission_spec: Dict[str, Any]) -> Tuple[bool, List[str]]:
-    """
-    Validate top-level mission_spec dict.
-    Returns (ok, errors_list).
-    Checks:
-      - 'task' present and in TASK_TYPES
-      - 'params' validated according to task
-      - 'area' basic numeric shape (x1,y1,x2,y2) optional but if present normalized
-    """
     errors: List[str] = []
 
     if not isinstance(mission_spec, dict):
@@ -149,7 +125,7 @@ def validate_mission_spec(mission_spec: Dict[str, Any]) -> Tuple[bool, List[str]
     elif task == "env_analysis":
         errors.extend(_validate_env_analysis(params))
 
-    # area validation (optional)
+    # opcional
     area = mission_spec.get("area")
     if area is not None:
         norm = _normalize_area(area)
@@ -160,40 +136,30 @@ def validate_mission_spec(mission_spec: Dict[str, Any]) -> Tuple[bool, List[str]
     return ok, errors
 
 
-# -------------------------------------------------------------------
-# Helpers to convert mission_spec <-> TLVs (binary_proto)
-# -------------------------------------------------------------------
-def mission_spec_to_tlvs(mission_spec: Dict[str, Any]) -> List[tuple]:
-    """
-    Convert a mission_spec (dict) into a list of TLV tuples suitable for
-    binary_proto.pack_ml_datagram.
 
-    TLVs emitted (if present):
-      - TLV_MISSION_ID (string)  -- if mission_id present
-      - TLV_TASK (string)
-      - TLV_AREA (6*float32) -- if area present
-      - TLV_PARAMS_JSON (string) -- JSON-encoded params (keeps params flexible)
-    """
+#  mission_spec <-> TLVs (binary_proto)
+
+def mission_spec_to_tlvs(mission_spec: Dict[str, Any]) -> List[tuple]:
     tlvs: List[tuple] = []
 
-    # mission_id (optional)
+    # mission_id 
     mid = mission_spec.get("mission_id")
     if mid:
         tlvs.append((binary_proto.TLV_MISSION_ID, str(mid).encode("utf-8")))
 
-    # task (required)
+    # task 
     task = mission_spec.get("task")
     if task:
         tlvs.append(binary_proto.tlv_string(binary_proto.TLV_TASK, str(task)))
 
-    # area -- normalize and encode as 6*float32 (x1,y1,z1,x2,y2,z2)
+    # area
     area = _normalize_area(mission_spec.get("area")) if mission_spec.get("area") is not None else None
     if area:
         vals = (float(area["x1"]), float(area["y1"]), float(area["z1"]), float(area["x2"]), float(area["y2"]), float(area["z2"]))
         area_bytes = struct.pack(">ffffff", *vals)
         tlvs.append((binary_proto.TLV_AREA, area_bytes))
 
-    # params -> JSON string TLV
+    # params
     params = mission_spec.get("params")
     if params is not None:
         try:
@@ -207,12 +173,7 @@ def mission_spec_to_tlvs(mission_spec: Dict[str, Any]) -> List[tuple]:
 
 
 def mission_spec_from_tlvmap(tlv_map: Dict[int, List[bytes]]) -> Dict[str, Any]:
-    """
-    Convert TLV map (as returned by binary_proto.parse_ml_datagram()['tlvs'])
-    back to a mission_spec dict.
 
-    Recognises TLV_MISSION_ID, TLV_TASK, TLV_AREA, TLV_PARAMS_JSON, TLV_MISSION_SPEC.
-    """
     ms: Dict[str, Any] = {}
 
     if binary_proto.TLV_MISSION_ID in tlv_map:
@@ -239,7 +200,6 @@ def mission_spec_from_tlvmap(tlv_map: Dict[int, List[bytes]]) -> Dict[str, Any]:
             params_json = tlv_map[binary_proto.TLV_PARAMS_JSON][0].decode("utf-8")
             ms["params"] = json.loads(params_json)
         except Exception:
-            # fallback to raw string
             try:
                 ms["params"] = json.loads(tlv_map[binary_proto.TLV_PARAMS_JSON][0].decode("latin-1"))
             except Exception:
@@ -254,11 +214,8 @@ def mission_spec_from_tlvmap(tlv_map: Dict[int, List[bytes]]) -> Dict[str, Any]:
                 # merge fields
                 ms.update(parsed)
         except Exception:
-            # ignore
-
             pass
 
-    # Normalize area shapes if present
     if "area" in ms:
         norm = _normalize_area(ms.get("area"))
         if norm:
@@ -268,11 +225,6 @@ def mission_spec_from_tlvmap(tlv_map: Dict[int, List[bytes]]) -> Dict[str, Any]:
 
 
 def normalize_mission_spec(mission_spec: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Return a normalized copy of mission_spec:
-      - ensure 'params' exists (dict)
-      - normalize area shape
-    """
     out: Dict[str, Any] = {}
     out.update(mission_spec)
     params = out.get("params", {})
